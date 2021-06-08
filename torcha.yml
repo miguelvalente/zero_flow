@@ -1,4 +1,0 @@
-name: ENVNAME
-channels:
-  - defaults
-prefix: /home/mvalente/.config/anaconda3/envs/ENVNAME

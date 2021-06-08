@@ -42,7 +42,8 @@ class AlbertEncoder:
         split_text = split_with_overlap(long_text,
                                         max_length=self.albert_config['max_length'],
                                         overlap_window_length=self.albert_config['overlap_window'],
-                                        tokenize_func=self.tokenizer.tokenize)  # NOTE: This is not fully correct. Has issues with sub-words (results do not differ much, however).
+                                        tokenize_func=self.tokenizer.tokenize)  # NOTE: This is not fully correct. Has issues with sub-words
+# (results do not differ much, however).
 
         encoded_splits = None
         _from = 0
@@ -56,7 +57,7 @@ class AlbertEncoder:
             _from = to
             to = _from + batch
 
-        #encoded_splits = self(split_text).numpy()
+        # encoded_splits = self(split_text).numpy()
         return self.aggregate_split_text(encoded_splits)
 
     def encode_multiple_descriptions(self, long_texts_list):
