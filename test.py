@@ -2,10 +2,6 @@ from text_encoders.text_encoder import AlbertEncoder
 import numpy as np
 from data_utils import article_correspondences
 
-path = "data/class_article_correspondences/class_article_correspondences_mp500.csv"
-path2 = "data/class_article_text_descriptions/class_article_text_descriptions_mp500.pkl"
-
-article_correspondences, articles = article_correspondences(path, path2)
 
 albert = AlbertEncoder({
     'model_name': 'albert-base-v2',
@@ -25,6 +21,6 @@ for t in texts:
 
 batch_1_emb = np.sum(batch_1_emb, axis=0)
 
-batch_2_emb = albert.encode_multiple_descriptions(articles[1007]['articles'])
+batch_2_emb = albert.encode_multiple_descriptions(texts)
 
 np.testing.assert_almost_equal(batch_2_emb, batch_1_emb)

@@ -30,7 +30,7 @@ def reduce_mean_masked(x, mask, axis):
 
 
 def reduce_sum_masked(x, mask, axis):
-    x = x * mask.float()
+    x = x * mask
     m = x.sum(axis=axis)
     return m
 

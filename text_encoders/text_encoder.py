@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from torch._C import device
 from transformers import AlbertTokenizer, AlbertModel
 import utils
 from text_encoders.text_encoder_utils import split_with_overlap
@@ -7,23 +8,28 @@ from text_encoders.text_encoder_utils import split_with_overlap
 # Adapted to PyTorch and my use case from https://github.com/sebastianbujwid/zsl_text_imagenet.git
 
 class AlbertEncoder:
-    def __init__(self, albert_config):
+    def __init__(self, albert_config, device):
         self.albert_config = albert_config
+        self.device = device
         model_name = self.albert_config['model_name']
         self.tokenizer = AlbertTokenizer.from_pretrained(model_name)
         self.model = AlbertModel.from_pretrained(model_name)
+        self.model = self.model.to(self.device)
         self.summary_extraction_mode = self.albert_config['summary_extraction_mode']
 
     def __call__(self, input_texts, **kwargs):
         inputs = self.tokenizer.batch_encode_plus(input_texts, add_special_tokens=True, return_tensors='pt', padding=True)
         input_ids = inputs['input_ids']
         attention_mask = (input_ids != self.tokenizer.pad_token_id).float()
+        input_ids = input_ids.to(self.device)
+        attention_mask = attention_mask.to(self.device)
         outputs = self.model(input_ids, attention_mask=attention_mask)
         return self.extract_text_summary(outputs, attention_mask)
 
     def extract_text_summary(self, outputs, attention_mask):
         mode = self.summary_extraction_mode
-        last_hidden_states, pooler_output = outputs
+        last_hidden_states = outputs['last_hidden_state']
+        pooler_output = outputs['pooler_output']
         if mode == 'mean_tokens':
             m = utils.reduce_mean_masked(last_hidden_states, mask=attention_mask.unsqueeze(-1), axis=1)
             return m
@@ -49,7 +55,7 @@ class AlbertEncoder:
         _from = 0
         to = _from + batch
         while _from < len(split_text):
-            encoded = self(split_text[_from:to]).detach().numpy()
+            encoded = self(split_text[_from:to]).detach().cpu().numpy()
             if encoded_splits is None:
                 encoded_splits = encoded
             else:

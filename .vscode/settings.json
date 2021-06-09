@@ -17,7 +17,7 @@
         "configurations": [],
         "compounds": []
     },
-    "python.pythonPath": "/home/mvalente/.config/anaconda3/envs/torcha/bin/python",
+    "python.pythonPath": "/opt/conda/envs/flow/bin/python",
     "python.linting.pycodestyleEnabled": false,
     "python.linting.pylintEnabled": false,
     "python.linting.mypyEnabled": false,
