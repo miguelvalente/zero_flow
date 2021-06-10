@@ -30,7 +30,7 @@ articles = "data/ImageNet-Wiki_dataset/class_article_text_descriptions/class_art
 
 article_correspondences, articles = article_correspondences(class_ids, articles)
 
-albert = AlbertEncoder({
+albert = PhropetEncoder({
     'model_name': 'albert-base-v2',
     'summary_extraction_mode': 'sum_tokens',
     'aggregate_long_text_splits_method': 'mean',
@@ -48,7 +48,7 @@ articles_id = list(set(articles_id).intersection(tiny_ids))
 articles = [articles[art_id] for art_id in articles_id]
 
 semantic = tqdm(articles, desc='Encoding Semantic Descriptions')
-contexts = [torch.from_numpy(albert.encode_multiple_descriptions(article)) for article in semantic]
+contexts = [torch.from_numpy(albert.encode_multiple_descriptions(article[:2])) for article in semantic]
 contexts = torch.stack(contexts).to(device)
 config = wandb.config
 
