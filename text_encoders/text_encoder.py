@@ -8,21 +8,21 @@ from text_encoders.text_encoder_utils import split_with_overlap
 # Adapted to PyTorch and my use case from https://github.com/sebastianbujwid/zsl_text_imagenet.git
 
 class AlbertEncoder:
-    def __init__(self, albert_config, device):
+    def __init__(self, albert_config, device_comp):
         self.albert_config = albert_config
-        self.device = device
+        self.device_comp = device_comp
         model_name = self.albert_config['model_name']
         self.tokenizer = AlbertTokenizer.from_pretrained(model_name)
         self.model = AlbertModel.from_pretrained(model_name)
-        self.model = self.model.to(self.device)
+        self.model = self.model.to(self.device_comp)
         self.summary_extraction_mode = self.albert_config['summary_extraction_mode']
 
     def __call__(self, input_texts, **kwargs):
         inputs = self.tokenizer.batch_encode_plus(input_texts, add_special_tokens=True, return_tensors='pt', padding=True)
         input_ids = inputs['input_ids']
         attention_mask = (input_ids != self.tokenizer.pad_token_id).float()
-        input_ids = input_ids.to(self.device)
-        attention_mask = attention_mask.to(self.device)
+        input_ids = input_ids.to(self.v)
+        attention_mask = attention_mask.to(self.device_comp)
         outputs = self.model(input_ids, attention_mask=attention_mask)
         return self.extract_text_summary(outputs, attention_mask)
 

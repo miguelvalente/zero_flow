@@ -52,8 +52,6 @@ contexts = [torch.from_numpy(albert.encode_multiple_descriptions(article)) for a
 contexts = torch.stack(contexts).to(device)
 config = wandb.config
 
-points_per_sample = 30000
-
 input_dim = 4
 context_dim = contexts[0].shape[0]
 split_dim = input_dim - context_dim
@@ -89,7 +87,7 @@ for index in range(config['block_size']):
     if config['act_norm']:
         transforms.append(ActNormBijection(input_dim, data_dep_init=True))
     transforms.append(permuter(input_dim))
-    transforms.append(AffineCoupling(input_dim, hidden_dims=[2], non_linearity=non_linearity, net=config['net']))
+    transforms.append(AffineCoupling(input_dim, hidden_dims=[context_dim], non_linearity=non_linearity, net=config['net']))
 
 flow = Flow(transforms, base_dist)
 flow.train()
