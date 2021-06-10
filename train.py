@@ -14,13 +14,13 @@ from affine_coupling import AffineCoupling
 import torch.optim as optim
 import torch.distributions as dist
 from act_norm import ActNormBijection
-from text_encoders.text_encoder import AlbertEncoder
+from text_encoders.text_encoder import AlbertEncoder, ProphetNet
 from data_utils import article_correspondences
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-run = wandb.init(project='toy_data_zf', entity='mvalente',
-                 config=r'config/base_conf.yaml')
+# run = wandb.init(project='toy_data_zf', entity='mvalente',
+#                  config=r'config/base_conf.yaml')
 
 # class_ids = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_mp500.csv"
 class_ids = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
@@ -30,7 +30,7 @@ articles = "data/ImageNet-Wiki_dataset/class_article_text_descriptions/class_art
 
 article_correspondences, articles = article_correspondences(class_ids, articles)
 
-albert = PhropetEncoder({
+text_encoder = ProphetNet({
     'model_name': 'albert-base-v2',
     'summary_extraction_mode': 'sum_tokens',
     'aggregate_long_text_splits_method': 'mean',
@@ -47,10 +47,10 @@ articles_id = list(set(articles_id).intersection(tiny_ids))
 
 articles = [articles[art_id] for art_id in articles_id]
 
-semantic = tqdm(articles, desc='Encoding Semantic Descriptions')
-contexts = [torch.from_numpy(albert.encode_multiple_descriptions(article[:2])) for article in semantic]
+semantic = tqdm(articles[:2], desc='Encoding Semantic Descriptions')
+contexts = [torch.from_numpy(text_encoder.encode_multiple_descriptions(article)) for article in semantic]
 contexts = torch.stack(contexts).to(device)
-config = wandb.config
+# config = wandb.config
 
 input_dim = 4
 context_dim = contexts[0].shape[0]

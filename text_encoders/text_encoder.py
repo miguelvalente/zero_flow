@@ -1,49 +1,47 @@
 import torch
 import numpy as np
-from transformers import AlbertTokenizer, AlbertModel, ProphetNetTokenizer, ProphetNetModel
+from transformers import AlbertTokenizer, AlbertModel, ProphetNetTokenizer, ProphetNetModel, ProphetNetConfig, ProphetNetEncoder
 import utils
 from text_encoders.text_encoder_utils import split_with_overlap
 
 # Adapted to PyTorch and my use case from https://github.com/sebastianbujwid/zsl_text_imagenet.git
-
-class PhropetEncoder:
-    def __init__(self, albert_config):
+class ProphetNet:
+    def __init__(self, albert_config, device):
         self.albert_config = albert_config
+        config = ProphetNetConfig()
+        self.device = device
         model_name = self.albert_config['model_name']
         self.tokenizer = ProphetNetTokenizer.from_pretrained('microsoft/prophetnet-large-uncased')
-        self.model = ProphetNetModel.from_pretrained('microsoft/prophetnet-large-uncased')
-
-
+        self.model = ProphetNetEncoder(config).from_pretrained('patrickvonplaten/prophetnet-large-uncased-standalone')
+        self.model = self.model.to(device)
         self.summary_extraction_mode = self.albert_config['summary_extraction_mode']
 
     def __call__(self, input_texts, **kwargs):
-        s = tokenizer("Studies have been shown that owning a dog is good for you", return_tensors="pt").input_ids  # Batch size 1
-        decoder_input_ids = tokenizer("Studies show that", return_tensors="pt").input_ids  # Batch size 1
-        outputs = model(input_ids=input_ids, decoder_input_ids=decoder_input_ids)
-
-        last_hidden_states = outputs.last_hidden_state  # main stream hidden states
-        last_hidden_states_ngram = outputs.last_hidden_state_ngram  # predict hidden states
-
-
-
-
-        inputs = self.tokenizer.batch_encode_plus(input_texts, add_special_tokens=True, return_tensors='pt', padding=True)
+        inputs = self.tokenizer.batch_encode_plus(input_texts, add_special_tokens=True, return_tensors='pt', padding=True).to(self.device)
+        inputs = self.tokenizer.batch_encode_plus(input_texts,
+                                                  add_special_tokens=True,
+                                                  return_tensors='pt',
+                                                  padding=True).to(self.device)
+        #attention_mask = (inputs. != self.tokenizer.pad_token_id).float()
+        # attention_mask =
         input_ids = inputs['input_ids']
-        attention_mask = (input_ids != self.tokenizer.pad_token_id).float()
-        outputs = self.model(input_ids, attention_mask=attention_mask)
+        attention_mask = inputs['attention_mask']
+
+        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+
+        # outputs = self.model(input_ids, attention_mask=attention_mask)
         return self.extract_text_summary(outputs, attention_mask)
 
     def extract_text_summary(self, outputs, attention_mask):
         mode = self.summary_extraction_mode
-        last_hidden_states, pooler_output = outputs
+        last_hidden_states = outputs['last_hidden_state']
+
         if mode == 'mean_tokens':
             m = utils.reduce_mean_masked(last_hidden_states, mask=attention_mask.unsqueeze(-1), axis=1)
             return m
         elif mode == 'sum_tokens':
             m = utils.reduce_sum_masked(last_hidden_states, mask=attention_mask.unsqueeze(-1), axis=1)
             return m
-        elif mode == 'pooler_output':
-            return pooler_output
         else:
             # TODO - try other methods
             raise NotImplementedError()
@@ -61,7 +59,7 @@ class PhropetEncoder:
         _from = 0
         to = _from + batch
         while _from < len(split_text):
-            encoded = self(split_text[_from:to]).detach().numpy()
+            encoded = self(split_text[_from:to]).detach().cpu().numpy()
             if encoded_splits is None:
                 encoded_splits = encoded
             else:
@@ -95,23 +93,29 @@ class PhropetEncoder:
             raise NotImplementedError()
 
 class AlbertEncoder:
-    def __init__(self, albert_config):
+    def __init__(self, albert_config, device):
         self.albert_config = albert_config
+        self.device = device
         model_name = self.albert_config['model_name']
         self.tokenizer = AlbertTokenizer.from_pretrained(model_name)
         self.model = AlbertModel.from_pretrained(model_name)
+        self.model = self.model.to(device)
         self.summary_extraction_mode = self.albert_config['summary_extraction_mode']
 
     def __call__(self, input_texts, **kwargs):
         inputs = self.tokenizer.batch_encode_plus(input_texts, add_special_tokens=True, return_tensors='pt', padding=True)
         input_ids = inputs['input_ids']
         attention_mask = (input_ids != self.tokenizer.pad_token_id).float()
+        input_ids = input_ids.to(self.device)
+        attention_mask = attention_mask.to(self.device)
         outputs = self.model(input_ids, attention_mask=attention_mask)
         return self.extract_text_summary(outputs, attention_mask)
 
     def extract_text_summary(self, outputs, attention_mask):
         mode = self.summary_extraction_mode
-        last_hidden_states, pooler_output = outputs
+        pooler_output = outputs['pooler_output']
+        last_hidden_states = outputs['last_hidden_state']
+
         if mode == 'mean_tokens':
             m = utils.reduce_mean_masked(last_hidden_states, mask=attention_mask.unsqueeze(-1), axis=1)
             return m
@@ -137,7 +141,7 @@ class AlbertEncoder:
         _from = 0
         to = _from + batch
         while _from < len(split_text):
-            encoded = self(split_text[_from:to]).detach().numpy()
+            encoded = self(split_text[_from:to]).detach().cpu().numpy()
             if encoded_splits is None:
                 encoded_splits = encoded
             else:
