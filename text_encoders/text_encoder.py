@@ -22,7 +22,7 @@ class ProphetNet:
                                                   add_special_tokens=True,
                                                   return_tensors='pt',
                                                   padding=True).to(self.device)
-        #attention_mask = (inputs. != self.tokenizer.pad_token_id).float()
+        # attention_mask = (inputs. != self.tokenizer.pad_token_id).float()
         # attention_mask =
         input_ids = inputs['input_ids']
         attention_mask = inputs['attention_mask']

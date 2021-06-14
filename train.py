@@ -19,12 +19,10 @@ from data_utils import article_correspondences
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# run = wandb.init(project='toy_data_zf', entity='mvalente',
-#                  config=r'config/base_conf.yaml')
+run = wandb.init(project='toy_data_zf', entity='mvalente',
+                 config=r'config/base_conf.yaml')
 
-# class_ids = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_mp500.csv"
 class_ids = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
-# articles = "data/ImageNet-Wiki_dataset/class_article_text_descriptions/class_article_text_descriptions_mp500.pkl"
 articles = "data/ImageNet-Wiki_dataset/class_article_text_descriptions/class_article_text_descriptions_trainval.pkl"
 
 
