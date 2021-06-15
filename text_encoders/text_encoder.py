@@ -1,36 +1,29 @@
 import torch
 import numpy as np
-from transformers import AlbertTokenizer, AlbertModel, ProphetNetTokenizer, ProphetNetModel, ProphetNetConfig, ProphetNetEncoder
+from transformers import AlbertTokenizer, AlbertModel, ProphetNetTokenizer, ProphetNetEncoder
 import utils
 from text_encoders.text_encoder_utils import split_with_overlap
 
-# Adapted to PyTorch and my use case from https://github.com/sebastianbujwid/zsl_text_imagenet.git
+# Adapted to PyTorch and to my use case from https://github.com/sebastianbujwid/zsl_text_imagenet.git
+
 class ProphetNet:
-    def __init__(self, albert_config, device):
-        self.albert_config = albert_config
-        config = ProphetNetConfig()
+    def __init__(self, config, device):
+        self.config = config
         self.device = device
-        model_name = self.albert_config['model_name']
         self.tokenizer = ProphetNetTokenizer.from_pretrained('microsoft/prophetnet-large-uncased')
-        self.model = ProphetNetEncoder(config).from_pretrained('patrickvonplaten/prophetnet-large-uncased-standalone')
+        self.model = ProphetNetEncoder.from_pretrained('patrickvonplaten/prophetnet-large-uncased-standalone')
         self.model = self.model.to(device)
-        self.summary_extraction_mode = self.albert_config['summary_extraction_mode']
+        self.summary_extraction_mode = self.config['summary_extraction_mode']
 
     def __call__(self, input_texts, **kwargs):
-        inputs = self.tokenizer.batch_encode_plus(input_texts, add_special_tokens=True, return_tensors='pt', padding=True).to(self.device)
         inputs = self.tokenizer.batch_encode_plus(input_texts,
                                                   add_special_tokens=True,
                                                   return_tensors='pt',
                                                   padding=True).to(self.device)
-        # attention_mask = (inputs. != self.tokenizer.pad_token_id).float()
-        # attention_mask =
-        input_ids = inputs['input_ids']
-        attention_mask = inputs['attention_mask']
 
-        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+        outputs = self.model(input_ids=inputs['input_ids'], attention_mask=inputs['attention_mask'])
 
-        # outputs = self.model(input_ids, attention_mask=attention_mask)
-        return self.extract_text_summary(outputs, attention_mask)
+        return self.extract_text_summary(outputs, inputs['attention_mask'])
 
     def extract_text_summary(self, outputs, attention_mask):
         mode = self.summary_extraction_mode
@@ -50,8 +43,8 @@ class ProphetNet:
         assert isinstance(long_text, str)
 
         split_text = split_with_overlap(long_text,
-                                        max_length=self.albert_config['max_length'],
-                                        overlap_window_length=self.albert_config['overlap_window'],
+                                        max_length=self.config['max_length'],
+                                        overlap_window_length=self.config['overlap_window'],
                                         tokenize_func=self.tokenizer.tokenize)  # NOTE: This is not fully correct. Has issues with sub-words
     # (results do not differ much, however).
 
@@ -72,7 +65,7 @@ class ProphetNet:
 
     def encode_multiple_descriptions(self, long_texts_list):
         assert isinstance(long_texts_list, list)
-        agg_method = self.albert_config['aggregate_descriptions_method']
+        agg_method = self.config['aggregate_descriptions_method']
 
         feats = [self.encode_long_text(t) for t in long_texts_list]
         if agg_method == 'mean_representations':
@@ -83,7 +76,7 @@ class ProphetNet:
         raise ValueError(f'Cannot recognize aggregation method for multiple descriptions: {agg_method}')
 
     def aggregate_split_text(self, splits):
-        method = self.albert_config['aggregate_long_text_splits_method']
+        method = self.config['aggregate_long_text_splits_method']
         if method == 'mean':
             return np.mean(splits, axis=0)
         elif method == 'sum':
@@ -93,14 +86,14 @@ class ProphetNet:
             raise NotImplementedError()
 
 class AlbertEncoder:
-    def __init__(self, albert_config, device):
-        self.albert_config = albert_config
+    def __init__(self, config, device):
+        self.config = config
         self.device = device
-        model_name = self.albert_config['model_name']
+        model_name = self.config['model_name']
         self.tokenizer = AlbertTokenizer.from_pretrained(model_name)
         self.model = AlbertModel.from_pretrained(model_name)
         self.model = self.model.to(device)
-        self.summary_extraction_mode = self.albert_config['summary_extraction_mode']
+        self.summary_extraction_mode = self.config['summary_extraction_mode']
 
     def __call__(self, input_texts, **kwargs):
         inputs = self.tokenizer.batch_encode_plus(input_texts, add_special_tokens=True, return_tensors='pt', padding=True)
@@ -132,8 +125,8 @@ class AlbertEncoder:
         assert isinstance(long_text, str)
 
         split_text = split_with_overlap(long_text,
-                                        max_length=self.albert_config['max_length'],
-                                        overlap_window_length=self.albert_config['overlap_window'],
+                                        max_length=self.config['max_length'],
+                                        overlap_window_length=self.config['overlap_window'],
                                         tokenize_func=self.tokenizer.tokenize)  # NOTE: This is not fully correct. Has issues with sub-words
     # (results do not differ much, however).
 
@@ -154,7 +147,7 @@ class AlbertEncoder:
 
     def encode_multiple_descriptions(self, long_texts_list):
         assert isinstance(long_texts_list, list)
-        agg_method = self.albert_config['aggregate_descriptions_method']
+        agg_method = self.config['aggregate_descriptions_method']
 
         feats = [self.encode_long_text(t) for t in long_texts_list]
         if agg_method == 'mean_representations':
@@ -165,7 +158,7 @@ class AlbertEncoder:
         raise ValueError(f'Cannot recognize aggregation method for multiple descriptions: {agg_method}')
 
     def aggregate_split_text(self, splits):
-        method = self.albert_config['aggregate_long_text_splits_method']
+        method = self.config['aggregate_long_text_splits_method']
         if method == 'mean':
             return np.mean(splits, axis=0)
         elif method == 'sum':

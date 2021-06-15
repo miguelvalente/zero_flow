@@ -1,62 +1,52 @@
 import os
 import torch
 import wandb
-from wandb.sdk_py27.lib.telemetry import context
 from transform import Flow
-from torch.utils.data import DataLoader, random_split
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-from distributions import DoubleDistribution, StandardNormal, Normal, SemanticDistribution
-import affine_coupling
+import tqdm
+from distributions import DoubleDistribution, SemanticDistribution
 from permuters import LinearLU, Permuter, Reverse
 import torch.nn as nn
 from affine_coupling import AffineCoupling
 import torch.optim as optim
 import torch.distributions as dist
 from act_norm import ActNormBijection
-from text_encoders.text_encoder import AlbertEncoder, ProphetNet
-from data_utils import article_correspondences
+from text_encoders.text_encoder import ProphetNet
+from text_encoders.context_encoder import Context
+
+import timm
+from PIL import Image
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
+from convert import CostumTransform
+import torchvision.datasets as datasets
+import torchvision.transforms as transforms
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 run = wandb.init(project='toy_data_zf', entity='mvalente',
                  config=r'config/base_conf.yaml')
 
-class_ids = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
-articles = "data/ImageNet-Wiki_dataset/class_article_text_descriptions/class_article_text_descriptions_trainval.pkl"
+config = wandb.config
 
+contexts = Context(config, device)
 
-article_correspondences, articles = article_correspondences(class_ids, articles)
+normalize_imagenet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                          std=[0.229, 0.224, 0.225])
 
-text_encoder = ProphetNet({
-    'model_name': 'albert-base-v2',
-    'summary_extraction_mode': 'sum_tokens',
-    'aggregate_long_text_splits_method': 'mean',
-    'aggregate_descriptions_method': 'sum_representations',
-    'overlap_window': 5,
-    'max_length': 20, }, device=device)
-
-
-image_net_dir = "data/tiny-imagenet-200/train"
-
-articles_id = [key for key, value in articles.items()]
-tiny_ids = [dirs for _, dirs, _ in os.walk(image_net_dir)][0]
-articles_id = list(set(articles_id).intersection(tiny_ids))
-
-articles = [articles[art_id] for art_id in articles_id]
-
-semantic = tqdm(articles[:2], desc='Encoding Semantic Descriptions')
-contexts = [torch.from_numpy(text_encoder.encode_multiple_descriptions(article)) for article in semantic]
-contexts = torch.stack(contexts).to(device)
-# config = wandb.config
+train_loader = torch.utils.data.DataLoader(
+    datasets.ImageFolder(config['image_net_dir'], transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        normalize_imagenet,
+        transforms.ToPILImage(mode='RGB'),
+        CostumTransform(config['image_encoder'])
+    ])), batch_size=config['batch_size'], shuffle=False, pin_memory=True)
 
 input_dim = 4
 context_dim = contexts[0].shape[0]
 split_dim = input_dim - context_dim
-
-# train_loader = DataLoader(,
-#                           batch_size=config['batch_size'],
-#                           shuffle=False, pin_memory=True)
 
 semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))
 semantic_distribution.log_prob(contexts, context=torch.arange(193)).mean()

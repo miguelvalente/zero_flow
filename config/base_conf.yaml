@@ -31,6 +31,30 @@ non_linearity:
 act_norm:
   desc: presence of actnorm
   value: true
+image_net_dir:
+  desc: directory for Image Net
+  value: /project/data/image_net/train
+text_encoder:
+  desc: wich encoder topick
+  value: prophet_net
+image_encoder:
+  desc: pretrained weights
+  value: efficientnet_b2
+summary_extraction_mode:
+  desc: type of extraction mode
+  value: sum_tokens
+aggregate_long_text_splits_method:
+  desc: type of aggregation
+  value: mean
+aggregate_descriptions_method:
+  desc: another aggregation
+  value: sum_representations
+overlap_window:
+  desc: how much overlap between articles
+  value: 5
+max_length:
+  desc: max length
+  value: 10
 
 
    
