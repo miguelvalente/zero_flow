@@ -234,6 +234,7 @@ class DoubleDistribution(TorchDistribution):
         self.split_dim = input_dim - context_dim
         self.semantic_distribution = semantic_distribution
         self.visual_distribution = visual_distribution
+        print()
 
     def log_prob(self, x, context):
         c_hat, z_hat = x.split([self.split_dim, self.context_dim], dim=1)

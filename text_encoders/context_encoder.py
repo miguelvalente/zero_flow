@@ -1,6 +1,7 @@
 import csv
 import os
 
+import numpy as np
 import pickle
 import torch
 from tqdm import tqdm
@@ -8,9 +9,11 @@ from text_encoders.text_encoder import AlbertEncoder, ProphetNet
 import yaml
 
 class ContextEncoder():
-    def __init__(self, config, device) -> None:
+    def __init__(self, config, seen_id, unseen_id, device) -> None:
         self.config = config
         self.device = device
+        self.seen_id = np.array(seen_id) - 1
+        self.unseen_id = np.array(unseen_id) - 1
 
         if self.config['text_encoder'] == 'prophet_net':
             self.text_encoder = ProphetNet(self.config, device=self.device)
@@ -28,20 +31,21 @@ class ContextEncoder():
             print("Dataset not found")
             raise
 
-    def __call__(self):
-        return self.contexts
-
     def encode_contexts_cub2011(self):
         dira = '/project/data/Raw_Wiki_Articles/CUBird_WikiArticles'
 
         file_list = next(os.walk(dira), (None, None, []))[2]
-        articles = [open(f'{dira}/{file}').read() for file in file_list]
+        file_list_id = [int(file.split('.')[0]) for file in file_list]
+        file_list_ordered = [x for _, x in sorted(zip(file_list_id, file_list))]
 
-        semantic = tqdm(articles[:2], desc='Encoding Semantic Descriptions CUB2011')
+        articles = [open(f'{dira}/{file}').read() for file in file_list_ordered]
+
+        semantic = tqdm(articles, desc='Encoding Semantic Descriptions CUB2011')
         contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)) for article in semantic]
-        self.contexts = torch.stack(contexts).to(self.device)
 
-        self.context_correspondence = [file[:-4] for file in file_list]
+        self.contexts = torch.stack(contexts)
+        self.cs = self.contexts[self.seen_id]
+        self.cu = self.contexts[self.unseen_id]
 
     def encode_contexts_imagenet(self):
         class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
@@ -80,5 +84,3 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     with open("/project/config/base_conf.yaml", "r") as ymlfile:
         config = yaml.load(ymlfile)
-
-    context = Context(config, device)

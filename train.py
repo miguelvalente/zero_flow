@@ -23,9 +23,10 @@ import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#CUDA_LAUNCH_BLOCKING = 1
 
-run = wandb.init(project='toy_data_zf', entity='mvalente',
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+run = wandb.init(project='zero_flow_CUB', entity='mvalente',
                  config=r'config/base_conf.yaml')
 
 config = wandb.config
@@ -42,10 +43,16 @@ transforms = transforms.Compose([
     CostumTransform(config['image_encoder'])
 ])
 
-cub = Cub2011(root='/project/data/', transform=transforms)
+cub = Cub2011(root='/project/data/', transform=transforms, download=False)
+seen_id = list(set(cub.data['target']))
+unseen_id = list(set(cub.data_unseen['target']))
 
-context_encoder = ContextEncoder(config, device)
-contexts = context_encoder.contexts
+context_encoder = ContextEncoder(config, seen_id, unseen_id, device)
+contexts = context_encoder.contexts.to(device)
+cs = context_encoder.cs.to(device)
+cu = context_encoder.cu.to(device)
+# cs = context_encoder.cs
+# cu = context_encoder.cu
 # normalize_imagenet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
 #                                           std=[0.229, 0.224, 0.225])
 
@@ -61,14 +68,11 @@ contexts = context_encoder.contexts
 
 train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-
 input_dim = cub[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
 semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))
-semantic_distribution.log_prob(contexts, context=torch.arange(193)).mean()
-
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 base_dist = DoubleDistribution(visual_distribution, semantic_distribution, input_dim, context_dim)
 
@@ -116,7 +120,7 @@ for epoch in epochs:
 
         optimizer.zero_grad()
         loss_flow = - flow.log_prob(data, targets).mean() * config['wt_f_l']
-        centralizing_loss = flow.centralizing_loss(data, targets, cs.to(device)) * config['wt_c_l']
+        centralizing_loss = flow.centralizing_loss(data, targets, cs) * config['wt_c_l']
         mmd_loss = flow.mmd_loss(data, cu.to(device)) * config['wt_mmd_l']
         loss = loss_flow + centralizing_loss + mmd_loss
         loss.backward()
