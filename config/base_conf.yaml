@@ -31,6 +31,12 @@ non_linearity:
 act_norm:
   desc: presence of actnorm
   value: true
+dataset:
+  desc: which dataset to use
+  value: cub2011 #imagenet
+cub2011_dir:
+  desc: directory for cub2011
+  value:
 image_net_dir:
   desc: directory for Image Net
   value: /project/data/image_net/train

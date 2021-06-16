@@ -11,7 +11,8 @@ import torch.optim as optim
 import torch.distributions as dist
 from act_norm import ActNormBijection
 from text_encoders.text_encoder import ProphetNet
-from text_encoders.context_encoder import Context
+from text_encoders.context_encoder import ContextEncoder
+from cub2011 import Cub2011
 
 import timm
 from PIL import Image
@@ -29,23 +30,40 @@ run = wandb.init(project='toy_data_zf', entity='mvalente',
 
 config = wandb.config
 
-contexts = Context(config, device)
+normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
+                                     std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
 
-normalize_imagenet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                          std=[0.229, 0.224, 0.225])
+transforms = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    normalize_cub,
+    transforms.ToPILImage(mode='RGB'),
+    CostumTransform(config['image_encoder'])
+])
 
-train_loader = torch.utils.data.DataLoader(
-    datasets.ImageFolder(config['image_net_dir'], transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        normalize_imagenet,
-        transforms.ToPILImage(mode='RGB'),
-        CostumTransform(config['image_encoder'])
-    ])), batch_size=config['batch_size'], shuffle=False, pin_memory=True)
+cub = Cub2011(root='/project/data/', transform=transforms)
 
-input_dim = 4
-context_dim = contexts[0].shape[0]
+context_encoder = ContextEncoder(config, device)
+contexts = context_encoder.contexts
+# normalize_imagenet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+#                                           std=[0.229, 0.224, 0.225])
+
+# train_loader = torch.utils.data.DataLoader(
+#     datasets.ImageFolder(config['image_net_dir'], transforms.Compose([
+#         transforms.Resize(256),
+#         transforms.CenterCrop(224),
+#         transforms.ToTensor(),
+#         normalize_imagenet,
+#         transforms.ToPILImage(mode='RGB'),
+#         CostumTransform(config['image_encoder'])
+#     ])), batch_size=config['batch_size'], shuffle=False, pin_memory=True)
+
+train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
+
+
+input_dim = cub[0][0].shape.numel()
+context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
 semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))

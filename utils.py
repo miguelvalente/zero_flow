@@ -35,20 +35,6 @@ def reduce_sum_masked(x, mask, axis):
     m = x.sum(axis=axis)
     return m
 
-def article_correspondences(class_article_correspondences_path, class_article_text_descriptions_path):
-    articles = pickle.load(
-        open(class_article_text_descriptions_path, 'rb')
-    )
-
-    temp = [articles[art] for art in articles]
-    articles = {t['wnid']: t['articles'] for t in temp}
-
-    with open(class_article_correspondences_path, 'r') as file:
-        reader = csv.reader(file)
-        article_correspondences = {item[0]: item[1:] for item in reader}  # Make a dictionary out of the csv {wnid: classes}
-
-    return article_correspondences, articles
-
 if __name__ == '__main__':
     x = torch.rand((2, 10, 10))
     mask = torch.ones(2, 10, 10)
