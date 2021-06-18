@@ -1,3 +1,5 @@
+from random import randrange
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -30,7 +32,6 @@ class Transform(nn.Module):
         """
         raise NotImplementedError()
 
-
 class PreConditionApplier(Transform):
     def __init__(self, transform, pre_conditioner):
         super().__init__()
@@ -46,7 +47,6 @@ class PreConditionApplier(Transform):
         context_for_transform = self.pre_conditioner(y, context)
         y = self.transform.inverse(y, context=context_for_transform)
         return y
-
 
 class Flow(Transform):
     '''Wrapper for merging multiple transforms'''
@@ -83,9 +83,10 @@ class Flow(Transform):
         """
         Centralizing loss
         """
+        padding = data.shape[1] - cs.shape[1]
         centralizing_loss = 0.0
         means = torch.stack([data[targets == t].mean(axis=0) for t in targets.unique()])
-        gens = self.generation(F.pad(cs[targets.unique()], (0, 2)))
+        gens = self.generation(F.pad(cs[targets.unique()], (0, padding)))
 
         return torch.norm(gens - means, dim=1).sum()
 
@@ -97,7 +98,9 @@ class Flow(Transform):
         mmd_loss = 0.0
         n = len(data)
 
-        v_hat = self.generation(torch.cat((cu.repeat(n, 1),
+        selected_idxs = cu[[randrange(cu.shape[0]) for _ in range(data.shape[0])]]
+
+        v_hat = self.generation(torch.cat((selected_idxs,
                                            self.base_dist.visual_distribution.sample([n])), dim=1))
 
         if k == 0:

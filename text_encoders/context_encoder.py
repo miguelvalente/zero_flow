@@ -46,6 +46,9 @@ class ContextEncoder():
         self.contexts = torch.stack(contexts)
         self.cs = self.contexts[self.seen_id]
         self.cu = self.contexts[self.unseen_id]
+        # self.contexts = torch.stack([torch.arange((1024)) * 200])
+        # self.cs = torch.ones((200))
+        # self.cu = torch.ones((200))
 
     def encode_contexts_imagenet(self):
         class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"

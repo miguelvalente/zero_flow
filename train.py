@@ -23,7 +23,7 @@ import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
 
-#CUDA_LAUNCH_BLOCKING = 1
+CUDA_LAUNCH_BLOCKING = 1
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
@@ -97,7 +97,10 @@ for index in range(config['block_size']):
     if config['act_norm']:
         transforms.append(ActNormBijection(input_dim, data_dep_init=True))
     transforms.append(permuter(input_dim))
-    transforms.append(AffineCoupling(input_dim, hidden_dims=[context_dim], non_linearity=non_linearity, net=config['net']))
+    transforms.append(AffineCoupling(
+        input_dim,
+        split_dim,
+        context_dim=context_dim, hidden_dims=[context_dim], non_linearity=non_linearity, net=config['net']))
 
 flow = Flow(transforms, base_dist)
 flow.train()
@@ -114,7 +117,7 @@ for epoch in epochs:
     losses_flow = []
     losses_centr = []
     losses_mmd = []
-    for data, targets in train_loader:
+    for data, targets in tqdm.tqdm(train_loader):
         data = data.to(device)
         targets = targets.to(device)
 
@@ -125,6 +128,10 @@ for epoch in epochs:
         loss = loss_flow + centralizing_loss + mmd_loss
         loss.backward()
         optimizer.step()
+
+        if loss.isnan():
+            print('Nan in loss!')
+            Exception('Nan in loss!')
 
         losses_flow.append(loss_flow.item())
         losses_centr.append(centralizing_loss.item())
