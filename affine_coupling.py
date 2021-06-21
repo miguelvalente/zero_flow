@@ -11,12 +11,13 @@ class AffineCoupling(Transform):
         super().__init__()
         self.event_dim = event_dim
         self.input_dim = input_dim
-        self.split_dim = split_dim
+        self.split_dim = input_dim // 2
         self.context_dim = context_dim
         out_dim = (self.input_dim - self.split_dim) * 2
         if net == 'MLP':
-            self.nn_s = MLP(self.context_dim, hidden_dims, self.split_dim, non_linearity)
-            self.nn_t = MLP(self.context_dim, hidden_dims, self.split_dim, non_linearity)
+            #  self.nn_s = MLP(self.context_dim, hidden_dims, self.split_dim, non_linearity)
+            #  self.nn_t = MLP(self.context_dim, hidden_dims, self.split_dim, non_linearity)
+            self.nn = MLP(self.split_dim, hidden_dims, out_dim, non_linearity)
         elif net == 'MLPR':
             self.nn_s = MLPR(self.input_dim - self.split_dim, hidden_dims, self.input_dim - self.split_dim, non_linearity)
             self.nn_t = MLPR(self.input_dim - self.split_dim, hidden_dims, self.input_dim - self.split_dim, non_linearity)
@@ -26,10 +27,9 @@ class AffineCoupling(Transform):
 
     def forward(self, x, context=None):
         x2_size = self.split_dim
-        x1, x2 = x.split([self.context_dim, x2_size], dim=self.event_dim)
+        x1, x2 = x.split([self.split_dim, x2_size], dim=self.event_dim)
 
-        shift = self.nn_s(x1)
-        scale = self.nn_t(x1)
+        shift, scale = self.nn(x1).split([x2_size, x2_size], dim=-1)
         scale = torch.sigmoid(scale + self.affine_scale_eps) + self.affine_eps
 
         y1 = x1
@@ -42,10 +42,9 @@ class AffineCoupling(Transform):
 
     def inverse(self, y, context=None):
         y2_size = self.split_dim
-        y1, y2 = y.split([self.context_dim, y2_size], dim=self.event_dim)
+        y1, y2 = y.split([self.split_dim, y2_size], dim=self.event_dim)
 
-        shift = self.nn_s(y1)
-        scale = self.nn_t(y1)
+        shift, scale = self.nn(y1).split([y2_size, y2_size], dim=-1)
         scale = torch.sigmoid(scale + self.affine_scale_eps) + self.affine_eps
 
         x1 = y1

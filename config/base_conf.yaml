@@ -6,10 +6,13 @@ batch_size:
   value: 256
 lr:
   desc: Learning rate
-  value: 0.005
+  value: 0.0005
 block_size:
   desc: Number of blocks
   value: 5
+hidden_dims:
+  desc: Number of hidden dims and their dimensions
+  value: [704,704]
 permuter:
   desc: type of permutation
   value: LinearLU # manual reverse random manual

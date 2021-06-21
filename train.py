@@ -23,7 +23,9 @@ import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
 
-CUDA_LAUNCH_BLOCKING = 1
+# CUDA_LAUNCH_BLOCKING = 1
+SAVE_PATH = 'checkpoints'
+save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
@@ -92,6 +94,11 @@ elif config['non_linearity'] == 'prelu':
 elif config['non_linearity'] == 'leakyrelu':
     non_linearity = nn.LeakyReLU()
 
+if not config['hidden_dims']:
+    hidden_dims = [input_dim // 2]
+else:
+    hidden_dims = config['hidden_dims']
+
 transforms = []
 for index in range(config['block_size']):
     if config['act_norm']:
@@ -100,15 +107,15 @@ for index in range(config['block_size']):
     transforms.append(AffineCoupling(
         input_dim,
         split_dim,
-        context_dim=context_dim, hidden_dims=[context_dim], non_linearity=non_linearity, net=config['net']))
+        context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=config['net']))
 
-flow = Flow(transforms, base_dist)
-flow.train()
-flow = flow.to(device)
+model = Flow(transforms, base_dist)
+model.train()
+model = model.to(device)
 
-print(f'Number of trainable parameters: {sum([x.numel() for x in flow.parameters()])}')
-run.watch(flow)
-optimizer = optim.Adam(flow.parameters(), lr=config['lr'])
+print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameters()])}')
+run.watch(model)
+optimizer = optim.Adam(model.parameters(), lr=config['lr'])
 
 epochs = tqdm.trange(1, config['epochs'])
 
@@ -122,9 +129,9 @@ for epoch in epochs:
         targets = targets.to(device)
 
         optimizer.zero_grad()
-        loss_flow = - flow.log_prob(data, targets).mean() * config['wt_f_l']
-        centralizing_loss = flow.centralizing_loss(data, targets, cs) * config['wt_c_l']
-        mmd_loss = flow.mmd_loss(data, cu.to(device)) * config['wt_mmd_l']
+        loss_flow = - model.log_prob(data, targets).mean() * config['wt_f_l']
+        centralizing_loss = model.centralizing_loss(data, targets, cs) * config['wt_c_l']
+        mmd_loss = model.mmd_loss(data, cu.to(device)) * config['wt_mmd_l']
         loss = loss_flow + centralizing_loss + mmd_loss
         loss.backward()
         optimizer.step()
@@ -133,15 +140,22 @@ for epoch in epochs:
             print('Nan in loss!')
             Exception('Nan in loss!')
 
+        run.log({"loss": loss,
+                 "loss_flow": loss_flow,  # }, step=epoch)
+                 "loss_central": centralizing_loss,  # }, step=epoch)
+                 "loss_mmd": mmd_loss})
+
         losses_flow.append(loss_flow.item())
         losses_centr.append(centralizing_loss.item())
         losses_mmd.append(mmd_loss.item())
         losses.append(loss.item())
 
-    run.log({"loss": sum(losses) / len(losses),
-             "loss_flow": sum(losses_flow) / len(losses_flow),  # }, step=epoch)
-             "loss_central": sum(losses_centr) / len(losses_centr),  # }, step=epoch)
-             "loss_mmd": sum(losses_mmd) / len(losses_mmd)}, step=epoch)
+    # run.log({"loss": sum(losses) / len(losses),
+    #          "loss_flow": sum(losses_flow) / len(losses_flow),  # }, step=epoch)
+    #          "loss_central": sum(losses_centr) / len(losses_centr),  # }, step=epoch)
+    #          "loss_mmd": sum(losses_mmd) / len(losses_mmd)}, step=epoch)
+    if epoch % 3 == 0 and save:
+        torch.save(model.state_dict(), f=f'{SAVE_PATH}/{wandb.run.name}-{epoch}.pth')
 
     if loss.isnan():
         print('Nan in loss!')

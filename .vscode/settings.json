@@ -17,7 +17,7 @@
         "configurations": [],
         "compounds": []
     },
-    "python.pythonPath": "/opt/conda/envs/flow/bin/python",
+    "python.pythonPath": "/opt/conda/bin/python",
     "python.linting.pycodestyleEnabled": false,
     "python.linting.pylintEnabled": false,
     "python.linting.mypyEnabled": false,
@@ -33,6 +33,7 @@
     "git.autofetch": null,
     "git.autoRepositoryDetection": false,
     "cSpell.ignoreWords": [
+        "cdist",
         "centr",
         "codomain",
         "densenn",
