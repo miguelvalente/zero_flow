@@ -24,12 +24,12 @@ import torchvision.transforms as transforms
 
 
 # CUDA_LAUNCH_BLOCKING = 1
-SAVE_PATH = 'checkpoints'
+SAVE_PATH = 'checkpoints/'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
-                 config=r'config/base_conf.yaml')
+                 config=r'config/flow_conf.yaml')
 
 config = wandb.config
 
@@ -156,7 +156,7 @@ for epoch in epochs:
         state = {'config': config.as_dict(),
                  'state_dict': model.state_dict()}
 
-        torch.save(state, f'{SAVE_PATH}/{wandb.run.name}-{epoch}.pth')
+        torch.save(state, f'{SAVE_PATH}{wandb.run.name}-{epoch}.pth')
 
     if loss.isnan():
         print('Nan in loss!')

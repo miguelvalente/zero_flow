@@ -12,7 +12,7 @@ block_size:
   value: 5
 hidden_dims:
   desc: Number of hidden dims and their dimensions
-  value: [704,704]
+  value: [704,704,704]
 permuter:
   desc: type of permutation
   value: LinearLU # manual reverse random manual
@@ -44,7 +44,7 @@ image_net_dir:
   desc: directory for Image Net
   value: /project/data/image_net/train
 text_encoder:
-  desc: wich encoder topick
+  desc: which text encoder to use
   value: prophet_net
 image_encoder:
   desc: pretrained weights

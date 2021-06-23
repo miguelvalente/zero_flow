@@ -1,0 +1,13 @@
+epochs:
+  desc: Number of epochs to train over
+  value: 31
+batch_size:
+  desc: Size of each batch
+  value: 256
+lr:
+  desc: Learning rate
+  value: 0.0005
+num_classes:
+  desc: Number of classes to use
+  value: 200  # Number of classes in CUB2011
+   

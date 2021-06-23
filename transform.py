@@ -51,7 +51,7 @@ class PreConditionApplier(Transform):
 class Flow(Transform):
     '''Wrapper for merging multiple transforms'''
 
-    def __init__(self, transform_list, base_dist, sample_dist=None):
+    def __init__(self, transform_list, base_dist=None, sample_dist=None):
         super().__init__()
         self.base_dist = base_dist
         self.sample_dist = sample_dist if sample_dist is not None else base_dist

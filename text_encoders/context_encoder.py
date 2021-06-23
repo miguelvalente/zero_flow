@@ -9,11 +9,12 @@ from text_encoders.text_encoder import AlbertEncoder, ProphetNet
 import yaml
 
 class ContextEncoder():
-    def __init__(self, config, seen_id, unseen_id, device) -> None:
+    def __init__(self, config, seen_id, unseen_id, device, generation=False) -> None:
         self.config = config
         self.device = device
         self.seen_id = np.array(seen_id) - 1
         self.unseen_id = np.array(unseen_id) - 1
+        self.generation = generation
 
         if self.config['text_encoder'] == 'prophet_net':
             self.text_encoder = ProphetNet(self.config, device=self.device)
@@ -40,12 +41,20 @@ class ContextEncoder():
 
         articles = [open(f'{dira}/{file}').read() for file in file_list_ordered]
 
-        semantic = tqdm(articles, desc='Encoding Semantic Descriptions CUB2011')
-        contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)) for article in semantic]
+        if self.generation:
+            articles = [articles[i] for i in self.unseen_id]
+            semantic = tqdm(articles, desc='Encoding Unseen Classes Semantic Descriptions CUB2011')
 
-        self.contexts = torch.stack(contexts)
-        self.cs = self.contexts[self.seen_id]
-        self.cu = self.contexts[self.unseen_id]
+            self.cu = [torch.from_numpy(self.text_encoder.encode_long_text(article)) for article in semantic]
+            self.cu = torch.stack(self.cu)
+        else:
+            semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
+
+            self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)) for article in semantic]
+
+            self.contexts = torch.stack(self.contexts)
+            self.cs = self.contexts[self.seen_id]
+            self.cu = self.contexts[self.unseen_id]
 
     def encode_contexts_imagenet(self):
         class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
