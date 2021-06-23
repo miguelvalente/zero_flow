@@ -64,6 +64,9 @@ overlap_window:
 max_length:
   desc: max length
   value: 10
+zero_split:
+  desc: what split is being used
+  value: zsl_split_20
 
 
    

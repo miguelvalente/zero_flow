@@ -1,3 +1,5 @@
+import os
+
 from text_encoders.text_encoder import AlbertEncoder
 import numpy as np
 import timm
@@ -5,8 +7,8 @@ import urllib
 from PIL import Image
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
-import torch
 
+import wandb
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -19,7 +21,26 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
+import yaml
 
+
+SAVE_PATH = 'checkpoints/'
+os.environ['WANDB_MODE'] = 'offline'
+save = True
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+run = wandb.init(project='zero_flow_CUB', entity='mvalente',
+                 config=r'config/base_conf.yaml')
+
+with open('config/base_conf.yaml') as f:
+    ya = yaml.load(f, Loader=yaml.FullLoader)
+config = wandb.config
+
+
+state = {'config': config.as_dict(),
+         'state_dict': torch.ones(2)}
+
+torch.save(state, 'teste_state.pt')
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])

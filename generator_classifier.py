@@ -23,8 +23,8 @@ import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
 
-# CUDA_LAUNCH_BLOCKING = 1
-SAVE_PATH = 'checkpoints'
+SAVE_PATH = 'checkpoints/'
+os.environ['WANDB_MODE'] = 'offline'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -56,15 +56,6 @@ contexts = context_encoder.contexts.to(device)
 cs = context_encoder.cs.to(device)
 cu = context_encoder.cu.to(device)
 
-# train_loader = torch.utils.data.DataLoader(
-#     datasets.ImageFolder(config['image_net_dir'], transforms.Compose([
-#         transforms.Resize(256),
-#         transforms.CenterCrop(224),
-#         transforms.ToTensor(),
-#         normalize_imagenet,
-#         transforms.ToPILImage(mode='RGB'),
-#         CostumTransform(config['image_encoder'])
-#     ])), batch_size=config['batch_size'], shuffle=False, pin_memory=True)
 
 train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
@@ -75,6 +66,7 @@ split_dim = input_dim - context_dim
 semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 base_dist = DoubleDistribution(visual_distribution, semantic_distribution, input_dim, context_dim)
+
 
 if config['permuter'] == 'random':
     permuter = lambda dim: Permuter(permutation=torch.randperm(dim, dtype=torch.long).to(device))
@@ -107,57 +99,17 @@ for index in range(config['block_size']):
         split_dim,
         context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=config['net']))
 
-model = Flow(transforms, base_dist)
-model.train()
-model = model.to(device)
+generator = Flow(transforms, base_dist)
+generator.load_state_dict(torch.load(f'{SAVE_PATH}true-fire-25-15.pth'))
+generator = generator.to(device)
+generator.eval()
 
-print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameters()])}')
-run.watch(model)
-optimizer = optim.Adam(model.parameters(), lr=config['lr'])
+generated_unseen_features = []
+number_samples = 60
+with torch.no_grad():
+    for cu_ in tqdm.tqdm(cu, desc="Generating Unseen Features"):
+        generated_unseen_features.append(generator.generation(
+            torch.hstack((cu_.repeat(number_samples).reshape(-1, context_dim),
+                          visual_distribution.sample([number_samples])))))
 
-epochs = tqdm.trange(1, config['epochs'])
-
-for epoch in epochs:
-    losses = []
-    losses_flow = []
-    losses_centr = []
-    losses_mmd = []
-    for data, targets in tqdm.tqdm(train_loader):
-        data = data.to(device)
-        targets = targets.to(device)
-
-        optimizer.zero_grad()
-        loss_flow = - model.log_prob(data, targets).mean() * config['wt_f_l']
-        centralizing_loss = model.centralizing_loss(data, targets, cs) * config['wt_c_l']
-        mmd_loss = model.mmd_loss(data, cu.to(device)) * config['wt_mmd_l']
-        loss = loss_flow + centralizing_loss + mmd_loss
-        loss.backward()
-        optimizer.step()
-
-        if loss.isnan():
-            print('Nan in loss!')
-            Exception('Nan in loss!')
-
-        run.log({"loss": loss,
-                 "loss_flow": loss_flow,  # }, step=epoch)
-                 "loss_central": centralizing_loss,  # }, step=epoch)
-                 "loss_mmd": mmd_loss})
-
-        losses_flow.append(loss_flow.item())
-        losses_centr.append(centralizing_loss.item())
-        losses_mmd.append(mmd_loss.item())
-        losses.append(loss.item())
-
-    # run.log({"loss": sum(losses) / len(losses),
-    #          "loss_flow": sum(losses_flow) / len(losses_flow),  # }, step=epoch)
-    #          "loss_central": sum(losses_centr) / len(losses_centr),  # }, step=epoch)
-    #          "loss_mmd": sum(losses_mmd) / len(losses_mmd)}, step=epoch)
-    if epoch % 3 == 0 and save:
-        state = {'config': config.as_dict(),
-                 'state_dict': model.state_dict()}
-
-        torch.save(state, f'{SAVE_PATH}/{wandb.run.name}-{epoch}.pth')
-
-    if loss.isnan():
-        print('Nan in loss!')
-        Exception('Nan in loss!')
+cub.insert_generated_features(torch.stack(generated_unseen_features), number_samples)

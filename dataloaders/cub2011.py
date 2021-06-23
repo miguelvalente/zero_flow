@@ -1,8 +1,12 @@
 import os
+
+import tqdm
 import pandas as pd
+import torch
 from torchvision.datasets.folder import default_loader
 from torchvision.datasets.utils import download_url
 from torch.utils.data import Dataset
+import itertools
 
 
 class Cub2011(Dataset):
@@ -15,6 +19,7 @@ class Cub2011(Dataset):
         self.root = os.path.expanduser(root)
         self.transform = transform
         self.loader = default_loader
+        self.zero_shot_mode = False
 
         if download:
             self._download()
@@ -63,15 +68,39 @@ class Cub2011(Dataset):
             tar.extractall(path=self.root)
 
     def __len__(self):
+        if self.zero_shot_mode:
+            return len(self.data) + len(self.data_generated_features)
         return len(self.data)
 
     def __getitem__(self, idx):
-        sample = self.data.iloc[idx]
-        path = os.path.join(self.root, self.base_folder, sample.filepath)
-        target = sample.target - 1  # Targets start at 1 by default, so shift to 0
-        img = self.loader(path)
+        if idx >= len(self.data):  # This is only true when zero_shot_mode = True
+            idx = idx - len(self.data)
+            target = self.data_generated_features_targets[idx] - 1  # Targets start at 1 by default, so shift to 0
+            img = self.data_generated_features[idx]
+        else:
+            sample = self.data.iloc[idx]
+            path = os.path.join(self.root, self.base_folder, sample.filepath)
+            target = sample.target - 1  # Targets start at 1 by default, so shift to 0
+            img = self.loader(path)
 
-        if self.transform is not None:
-            img = self.transform(img)
+            if self.transform is not None:
+                img = self.transform(img)
 
         return img, target
+
+    def insert_generated_features(self, generated_unseen_features, number_samples):
+        """Function used to insert unseen generated features for Generatice Zero Shot Learning
+           Also serves to set zero_shot_mode to True. This is used to calculate the lenght of the data with new unseeen features
+
+        Parameters:
+        generated_unseen_features (tensor array): Features generated for each unseen class
+        number_samples (int): number of generated samples per unseen class
+
+        """
+        
+        self.data_generated_features = (generated_unseen_features).reshape(-1, generated_unseen_features.shape[-1])
+        target_ids = self.data_unseen.target.unique()
+        self.data_generated_features_targets = list(itertools.chain.from_iterable(itertools.repeat(target_id, 60) for target_id in target_ids))
+
+        if not self.zero_shot_mode:
+            self.zero_shot_mode = True
