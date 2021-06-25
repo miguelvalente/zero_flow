@@ -16,6 +16,7 @@ from dataloaders.cub2011 import Cub2011
 
 import timm
 from PIL import Image
+from nets import Classifier
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from convert import CostumTransform
@@ -24,14 +25,14 @@ import torchvision.transforms as transforms
 
 
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-run = wandb.init(project='zero_flow_CUB', entity='mvalente',
+run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf.yaml')
 
-state = torch.load(f'{SAVE_PATH}resilient-snowball-40-12.pth')
+state = torch.load(f'{SAVE_PATH}resilient-snowball-40-18.pth')
 
 generator_config = state['config']
 
@@ -52,10 +53,10 @@ transforms_cub = transforms.Compose([
 ])
 
 cub = Cub2011(root='/project/data/', transform=transforms_cub, download=False)
-seen_id = list(set(cub.data['target']))
-unseen_id = list(set(cub.data_unseen['target']))
+seen_ids = list(set(cub.data['target']))
+unseen_ids = list(set(cub.data_unseen['target']))
 
-context_encoder = ContextEncoder(generator_config, seen_id, unseen_id, device, generation=True)
+context_encoder = ContextEncoder(generator_config, seen_ids, unseen_ids, device, generation=True)
 cu = context_encoder.cu.to(device)
 
 
@@ -106,25 +107,33 @@ with torch.no_grad():
         generated_unseen_features.append(generator.generation(
             torch.hstack((cu_.repeat(number_samples).reshape(-1, context_dim),
                           visual_distribution.sample([number_samples])))))
+generated_unseen_features = torch.stack(generated_unseen_features).to('cpu')
+cub.insert_generated_features(generated_unseen_features, number_samples)
 
-cub.insert_generated_features(torch.stack(generated_unseen_features), number_samples)
+try:  # Deletes genererator model since its not used anymore
+    del generator
+    torch.cuda.empty_cache()
+except Exception:
+    print("Failed to delete generator or clear CUDA cache memory")
 
 train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
+val_loader = torch.utils.data.DataLoader(cub, batch_size=1000, shuffle=False, pin_memory=True)
 
-model = timm.create_model(config['image_encoder'], pretrained=True, num_classes=config['num_classes'])
+model = Classifier(input_dim, config['num_classes'])
 model.train()
 model = model.to(device)
 
 print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameters()])}')
 run.watch(model)
-optimizer = optim.Adam(model.parameters(), lr=config['lr'])
-loss_fn = nn.CrossEntropyLoss().to(device)
 
-epochs = tqdm.trange(1, config['epochs'])
-for epoch in epochs:
+loss_fn = nn.CrossEntropyLoss().to(device)
+optimizer = optim.Adam(model.parameters(), lr=config['lr'])
+
+# epochs = tqdm.trange(1, config['epochs'])
+for epoch in range(config['epochs']):
     losses = []
     #  for batch_idx, (input, target) in enumerate(loader):
-    for data, targets in tqdm.tqdm(train_loader):
+    for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
 
@@ -132,10 +141,45 @@ for epoch in epochs:
         output = model(data)
         loss = loss_fn(output, targets)
         loss.backward()
+        losses.append(loss.item())
         optimizer.step()
+        wandb.log({"loss": loss})
 
-        if loss.isnan():
-            print('Nan in loss!')
-            Exception('Nan in loss!')
+    if epoch % 5 == 0:
+        with torch.no_grad():
+            correct_seen = 0
+            correct_unseen = 0
+            total_seen = 0
+            total_unseen = 0
+            accuracy_seen = 0
+            accuracy_unseen = 0
+            harmonic_mean = 0
 
-        run.log({"loss": loss})
+            cub.eval()  # Switch dataset return to img, target, seen_or_unseen
+            for data_val, target_val, seen_or_unseen in tqdm.tqdm(val_loader, desc="Validation"):
+                images = data_val.to(device)
+                labels = target_val.to(device)
+                outputs = model(images)
+
+                _, predicted = torch.max(outputs, 1)
+
+                total_seen += seen_or_unseen[seen_or_unseen == 1].numel()
+                total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
+
+                correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
+                correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
+
+            accuracy_seen = correct_seen / total_seen
+            accuracy_unseen = correct_unseen / total_unseen
+            harmonic_mean = 2 / (1 / accuracy_seen +
+                                 1 / accuracy_unseen)
+
+            wandb.log({"Acc_seen": accuracy_seen,
+                       "Acc_unseen": accuracy_unseen,
+                       "Harmonic Mean": harmonic_mean})
+
+            cub.eval()  # Switch dataset return to img, target
+
+    if loss.isnan():
+        print('Nan in loss!')
+        raise Exception('Nan in loss!')

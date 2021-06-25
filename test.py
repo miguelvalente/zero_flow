@@ -22,40 +22,23 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 import yaml
-
-
-SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'offline'
-save = True
+from nets import Classifier
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-run = wandb.init(project='zero_flow_CUB', entity='mvalente',
-                 config=r'config/base_conf.yaml')
-
-with open('config/base_conf.yaml') as f:
-    ya = yaml.load(f, Loader=yaml.FullLoader)
-config = wandb.config
 
 
-state = {'config': config.as_dict(),
-         'state_dict': torch.ones(2)}
+# model = Classifier(1000, 10)
 
-torch.save(state, 'teste_state.pt')
+# model(torch.arange(1000).float())
+model = timm.create_model('efficientnet_b2', pretrained=True, num_classes=10)
 
-normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
 
 # valdir = '/project/data/val'
 
 # val_dataset = datasets.ImageFolder(
 #     valdir,
-#     transforms.Compose([
-#         transforms.RandomResizedCrop(224),
-#         transforms.RandomHorizontalFlip(),
-#         transforms.ToTensor(),
-#         normalize,
-#     ]))
 
+#         transforms.RandomHorizontalFlip(), #         transforms.ToTensor(), #         normalize, #     ]))
 
 # print()
 

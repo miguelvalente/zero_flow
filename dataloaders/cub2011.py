@@ -20,6 +20,7 @@ class Cub2011(Dataset):
         self.transform = transform
         self.loader = default_loader
         self.zero_shot_mode = False
+        self.evaluation = False
 
         if download:
             self._download()
@@ -74,10 +75,12 @@ class Cub2011(Dataset):
 
     def __getitem__(self, idx):
         if idx >= len(self.data):  # This is only true when zero_shot_mode = True
+            seen_or_unseen = 0
             idx = idx - len(self.data)
             target = self.data_generated_features_targets[idx] - 1  # Targets start at 1 by default, so shift to 0
             img = self.data_generated_features[idx]
         else:
+            seen_or_unseen = 1
             sample = self.data.iloc[idx]
             path = os.path.join(self.root, self.base_folder, sample.filepath)
             target = sample.target - 1  # Targets start at 1 by default, so shift to 0
@@ -86,7 +89,10 @@ class Cub2011(Dataset):
             if self.transform is not None:
                 img = self.transform(img)
 
-        return img, target
+        if not self.evaluation:
+            return img, target
+        else:
+            return img, target, seen_or_unseen  # unseen = 0 / seen = 1
 
     def insert_generated_features(self, generated_unseen_features, number_samples):
         """Function used to insert unseen generated features for Generatice Zero Shot Learning
@@ -97,10 +103,17 @@ class Cub2011(Dataset):
         number_samples (int): number of generated samples per unseen class
 
         """
-        
+
         self.data_generated_features = (generated_unseen_features).reshape(-1, generated_unseen_features.shape[-1])
         target_ids = self.data_unseen.target.unique()
         self.data_generated_features_targets = list(itertools.chain.from_iterable(itertools.repeat(target_id, 60) for target_id in target_ids))
 
         if not self.zero_shot_mode:
             self.zero_shot_mode = True
+
+    def eval(self):
+        '''Function to set self.evaluation True and False to change __getitem__() return'''
+        if self.evaluation:
+            self.evaluation = False
+        else:
+            self.evaluation = True

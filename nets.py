@@ -48,3 +48,17 @@ class MLPR(nn.Module):
 
         x = self.out_layer(x)
         return x
+
+class Classifier(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_dims=False):
+        super().__init__()
+
+        if hidden_dims:
+            raise NotImplementedError
+        else:
+            self.classifier = nn.Linear(input_dim, output_dim)
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, input_data):
+        output = self.softmax(self.classifier(input_data))
+        return output
