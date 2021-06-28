@@ -10,7 +10,7 @@ from affine_coupling import AffineCoupling
 import torch.optim as optim
 import torch.distributions as dist
 from act_norm import ActNormBijection
-from text_encoders.text_encoder import ProphetNet
+from text_encoders.text_encoder import ProphetNet, AlbertEncoder
 from text_encoders.context_encoder import ContextEncoder
 from dataloaders.cub2011 import Cub2011
 
@@ -25,6 +25,7 @@ import torchvision.transforms as transforms
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
+os.environ['WANDB_MODE'] = 'online'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,16 +56,6 @@ context_encoder = ContextEncoder(config, seen_id, unseen_id, device)
 contexts = context_encoder.contexts.to(device)
 cs = context_encoder.cs.to(device)
 cu = context_encoder.cu.to(device)
-
-# train_loader = torch.utils.data.DataLoader(
-#     datasets.ImageFolder(config['image_net_dir'], transforms.Compose([
-#         transforms.Resize(256),
-#         transforms.CenterCrop(224),
-#         transforms.ToTensor(),
-#         normalize_imagenet,
-#         transforms.ToPILImage(mode='RGB'),
-#         CostumTransform(config['image_encoder'])
-#     ])), batch_size=config['batch_size'], shuffle=False, pin_memory=True)
 
 train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
@@ -115,14 +106,12 @@ print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameter
 run.watch(model)
 optimizer = optim.Adam(model.parameters(), lr=config['lr'])
 
-epochs = tqdm.trange(1, config['epochs'])
-
-for epoch in epochs:
+for epoch in range(1, config['epochs']):
     losses = []
     losses_flow = []
     losses_centr = []
     losses_mmd = []
-    for data, targets in tqdm.tqdm(train_loader):
+    for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
 
@@ -138,20 +127,16 @@ for epoch in epochs:
             print('Nan in loss!')
             Exception('Nan in loss!')
 
-        run.log({"loss": loss,
-                 "loss_flow": loss_flow,  # }, step=epoch)
-                 "loss_central": centralizing_loss,  # }, step=epoch)
-                 "loss_mmd": mmd_loss})
+        run.log({"loss": loss.item(),
+                 "loss_flow": loss_flow.item(),  # }, step=epoch)
+                 "loss_central": centralizing_loss.item(),  # }, step=epoch)
+                 "loss_mmd": mmd_loss.item()})
 
         losses_flow.append(loss_flow.item())
         losses_centr.append(centralizing_loss.item())
         losses_mmd.append(mmd_loss.item())
         losses.append(loss.item())
 
-    # run.log({"loss": sum(losses) / len(losses),
-    #          "loss_flow": sum(losses_flow) / len(losses_flow),  # }, step=epoch)
-    #          "loss_central": sum(losses_centr) / len(losses_centr),  # }, step=epoch)
-    #          "loss_mmd": sum(losses_mmd) / len(losses_mmd)}, step=epoch)
     if epoch % 3 == 0 and save:
         state = {'config': config.as_dict(),
                  'state_dict': model.state_dict()}

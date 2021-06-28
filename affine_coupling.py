@@ -15,8 +15,6 @@ class AffineCoupling(Transform):
         self.context_dim = context_dim
         out_dim = (self.input_dim - self.split_dim) * 2
         if net == 'MLP':
-            #  self.nn_s = MLP(self.context_dim, hidden_dims, self.split_dim, non_linearity)
-            #  self.nn_t = MLP(self.context_dim, hidden_dims, self.split_dim, non_linearity)
             self.nn = MLP(self.split_dim, hidden_dims, out_dim, non_linearity)
         elif net == 'MLPR':
             self.nn_s = MLPR(self.input_dim - self.split_dim, hidden_dims, self.input_dim - self.split_dim, non_linearity)

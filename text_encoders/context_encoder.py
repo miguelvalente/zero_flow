@@ -5,7 +5,7 @@ import numpy as np
 import pickle
 import torch
 from tqdm import tqdm
-from text_encoders.text_encoder import AlbertEncoder, ProphetNet
+from text_encoders.text_encoder import AlbertEncoder, ProphetNet, BartEncoder
 import yaml
 
 class ContextEncoder():
@@ -20,6 +20,8 @@ class ContextEncoder():
             self.text_encoder = ProphetNet(self.config, device=self.device)
         elif self.config['text_encoder'] == 'albert':
             self.text_encoder = AlbertEncoder(self.config, device=self.device)
+        elif self.config['text_encoder'] == 'bart':
+            self.text_encoder = BartEncoder(self.config, device=self.device)
         else:
             print("Model not found")
             raise

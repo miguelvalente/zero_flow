@@ -42,6 +42,9 @@ class Cub2011(Dataset):
 
         self.data_unseen = self.data[self.data.is_training_img == 0]
         self.data = self.data[self.data.is_training_img == 1]
+        self.seen_len = len(self.data)
+
+        self.data = pd.concat([self.data, self.data_unseen])
 
     def _check_integrity(self):
         try:
@@ -72,12 +75,52 @@ class Cub2011(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        sample = self.data.iloc[idx]
-        path = os.path.join(self.root, self.base_folder, sample.filepath)
-        target = sample.target - 1  # Targets start at 1 by default, so shift to 0
-        img = self.loader(path)
+        if self.evaluation:
+            sample = self.data.iloc[idx]
+            path = os.path.join(self.root, self.base_folder, sample.filepath)
+            target = sample.target - 1  # Targets start at 1 by default, so shift to 0
+            img = self.loader(path)
+            seen_or_unseen = sample.is_training_img
+            if self.transform is not None:
+                img = self.transform(img)
 
-        if self.transform is not None:
-            img = self.transform(img)
+            return img, target, seen_or_unseen  # unseen = 1 / seen = 0
+        else:
+            if idx >= self.seen_len:  # This is only true when zero_shot_mode = True
+                idx = idx - self.seen_len
+                target = self.data_generated_features_targets[idx] - 1  # Targets start at 1 by default, so shift to 0
+                img = self.data_generated_features[idx]
+            else:
+                sample = self.data.iloc[idx]
+                path = os.path.join(self.root, self.base_folder, sample.filepath)
+                target = sample.target - 1  # Targets start at 1 by default, so shift to 0
+                img = self.loader(path)
+                if self.transform is not None:
+                    img = self.transform(img)
 
-        return img, target
+            return img, target
+
+    def insert_generated_features(self, generated_unseen_features, number_samples):
+        """Function used to insert unseen generated features for Generatice Zero Shot Learning
+           Also serves to set zero_shot_mode to True. This is used to calculate the lenght of the data with new unseeen features
+
+        Parameters:
+        generated_unseen_features (tensor array): Features generated for each unseen class
+        number_samples (int): number of generated samples per unseen class
+
+        """
+        self.data_generated_features = (generated_unseen_features).reshape(-1, generated_unseen_features.shape[-1])
+        target_ids = self.data_unseen.target.unique()
+        self.data_generated_features_targets = list(itertools.chain.from_iterable(itertools.repeat(target_id, 60) for target_id in target_ids))
+
+        if not self.zero_shot_mode:
+            self.zero_shot_mode = True
+
+    def eval(self):
+        '''Function to set self.evaluation True and False to change __getitem__() return'''
+        if self.evaluation:
+            self.evaluation = False
+        else:
+            self.evaluation = True
+
+       # self.evaluation = True if self.evaluation else False

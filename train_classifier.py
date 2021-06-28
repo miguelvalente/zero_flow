@@ -12,7 +12,7 @@ import torch.distributions as dist
 from act_norm import ActNormBijection
 from text_encoders.text_encoder import ProphetNet
 from text_encoders.context_encoder import ContextEncoder
-from dataloaders.cub2011 import Cub2011
+from dataloaders.cub2011_zero import Cub2011
 
 import timm
 from PIL import Image
@@ -25,7 +25,7 @@ import torchvision.transforms as transforms
 
 
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'online'
+os.environ['WANDB_MODE'] = 'offline'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -117,7 +117,7 @@ except Exception:
     print("Failed to delete generator or clear CUDA cache memory")
 
 train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
-val_loader = torch.utils.data.DataLoader(cub, batch_size=1000, shuffle=False, pin_memory=True)
+val_loader = torch.utils.data.DataLoader(cub, batch_size=1000, shuffle=True, pin_memory=True)
 
 model = Classifier(input_dim, config['num_classes'])
 model.train()
@@ -133,17 +133,17 @@ optimizer = optim.Adam(model.parameters(), lr=config['lr'])
 for epoch in range(config['epochs']):
     losses = []
     #  for batch_idx, (input, target) in enumerate(loader):
-    for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
-        data = data.to(device)
-        targets = targets.to(device)
+    # for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
+    #     data = data.to(device)
+    #     targets = targets.to(device)
 
-        optimizer.zero_grad()
-        output = model(data)
-        loss = loss_fn(output, targets)
-        loss.backward()
-        losses.append(loss.item())
-        optimizer.step()
-        wandb.log({"loss": loss})
+    #     optimizer.zero_grad()
+    #     output = model(data)
+    #     loss = loss_fn(output, targets)
+    #     loss.backward()
+    #     losses.append(loss.item())
+    #     optimizer.step()
+    #     wandb.log({"loss": loss})
 
     if epoch % 5 == 0:
         with torch.no_grad():
@@ -168,18 +168,19 @@ for epoch in range(config['epochs']):
 
                 correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
                 correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
+                print(f'total_seen:{total_seen} | total_unseen:{total_unseen} = {total_unseen + total_seen}')
 
-            accuracy_seen = correct_seen / total_seen
-            accuracy_unseen = correct_unseen / total_unseen
-            harmonic_mean = 2 / (1 / accuracy_seen +
-                                 1 / accuracy_unseen)
+            # accuracy_seen = correct_seen / total_seen
+            # accuracy_unseen = correct_unseen / total_unseen
+            # harmonic_mean = 2 / (1 / accuracy_seen +
+            #                      1 / accuracy_unseen)
 
-            wandb.log({"Acc_seen": accuracy_seen,
-                       "Acc_unseen": accuracy_unseen,
-                       "Harmonic Mean": harmonic_mean})
+            # wandb.log({"Acc_seen": accuracy_seen,
+            #            "Acc_unseen": accuracy_unseen,
+            #            "Harmonic Mean": harmonic_mean})
 
             cub.eval()  # Switch dataset return to img, target
 
-    if loss.isnan():
-        print('Nan in loss!')
-        raise Exception('Nan in loss!')
+    # if loss.isnan():
+    #     print('Nan in loss!')
+    #     raise Exception('Nan in loss!')

@@ -12,7 +12,7 @@ block_size:
   value: 5
 hidden_dims:
   desc: Number of hidden dims and their dimensions
-  value: [704,704,704]
+  value: False
 permuter:
   desc: type of permutation
   value: LinearLU # manual reverse random manual
@@ -45,10 +45,13 @@ image_net_dir:
   value: /project/data/image_net/train
 text_encoder:
   desc: which text encoder to use
-  value: prophet_net
+  value: bart #albert  # prophet_net
+model_name:
+  desc: model name of text encoder
+  value: albert-base-v2 # albert-xxlarge-v2
 image_encoder:
   desc: pretrained weights
-  value: efficientnet_b2
+  value: resnet50d # efficientnet_b2
 summary_extraction_mode:
   desc: type of extraction mode
   value: sum_tokens
@@ -66,7 +69,7 @@ max_length:
   value: 10
 zero_split:
   desc: what split is being used
-  value: zsl_split_20
+  value: zsl_split_20 #easy_CUB2011 hard_CUB2011
 
 
    
