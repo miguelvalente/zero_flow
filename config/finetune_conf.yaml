@@ -7,6 +7,9 @@ batch_size:
 lr:
   desc: Learning rate
   value: 0.0005
+split:
+  desc: the kind of split
+  value: zsl_20
 num_classes:
   desc: Number of classes to use
   value: 200  # Number of classes in CUB2011

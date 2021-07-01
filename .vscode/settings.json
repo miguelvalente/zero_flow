@@ -30,6 +30,7 @@
         "--max-line-length=145",
         "--ignore=E402,F841,F401,E302,E305,E731",
     ],
+    "python.languageServer": "None",
     "git.autofetch": null,
     "git.autoRepositoryDetection": false,
     "cSpell.ignoreWords": [

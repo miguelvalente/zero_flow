@@ -48,14 +48,16 @@ transforms_cub = transforms.Compose([
     CostumTransform(config['image_encoder'])
 ])
 
-cub = Cub2011(root='/project/data/', transform=transforms_cub, download=False)
-seen_id = list(set(cub.data['target']))
-unseen_id = list(set(cub.data_unseen['target']))
+cub = Cub2011(root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
+seen_id = cub.seen_id - 1
+unseen_id = cub.unseen_id
 
 context_encoder = ContextEncoder(config, seen_id, unseen_id, device)
 contexts = context_encoder.contexts.to(device)
 cs = context_encoder.cs.to(device)
 cu = context_encoder.cu.to(device)
+
+#  Free CUDA memoery from text encoder
 
 train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
@@ -108,17 +110,14 @@ optimizer = optim.Adam(model.parameters(), lr=config['lr'])
 
 for epoch in range(1, config['epochs']):
     losses = []
-    losses_flow = []
-    losses_centr = []
-    losses_mmd = []
     for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
 
         optimizer.zero_grad()
         loss_flow = - model.log_prob(data, targets).mean() * config['wt_f_l']
-        centralizing_loss = model.centralizing_loss(data, targets, cs) * config['wt_c_l']
-        mmd_loss = model.mmd_loss(data, cu.to(device)) * config['wt_mmd_l']
+        centralizing_loss = model.centralizing_loss(data, targets, cs, seen_id) * config['wt_c_l']
+        mmd_loss = model.mmd_loss(data, cu) * config['wt_mmd_l']
         loss = loss_flow + centralizing_loss + mmd_loss
         loss.backward()
         optimizer.step()
@@ -127,18 +126,19 @@ for epoch in range(1, config['epochs']):
             print('Nan in loss!')
             Exception('Nan in loss!')
 
+        losses.append(loss.item())
+
         run.log({"loss": loss.item(),
                  "loss_flow": loss_flow.item(),  # }, step=epoch)
                  "loss_central": centralizing_loss.item(),  # }, step=epoch)
                  "loss_mmd": mmd_loss.item()})
 
-        losses_flow.append(loss_flow.item())
-        losses_centr.append(centralizing_loss.item())
-        losses_mmd.append(mmd_loss.item())
-        losses.append(loss.item())
+    run.log({"epoch": epoch})
+    print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')
 
-    if epoch % 3 == 0 and save:
+    if epoch % 2 == 0:
         state = {'config': config.as_dict(),
+                 'split': config['split'],
                  'state_dict': model.state_dict()}
 
         torch.save(state, f'{SAVE_PATH}{wandb.run.name}-{epoch}.pth')

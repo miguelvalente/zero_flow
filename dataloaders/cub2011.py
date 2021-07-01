@@ -15,8 +15,9 @@ class Cub2011(Dataset):
     filename = 'CUB_200_2011.tgz'
     tgz_md5 = '97eceeb196236b17998738112f37df78'
 
-    def __init__(self, root, transform=None, loader=default_loader, download=True):
+    def __init__(self, root, split='easy_split.txt', transform=None, loader=default_loader, download=True):
         self.root = os.path.expanduser(root)
+        self.split = split
         self.transform = transform
         self.loader = default_loader
         self.zero_shot_mode = False
@@ -34,7 +35,7 @@ class Cub2011(Dataset):
                              names=['img_id', 'filepath'])
         image_class_labels = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'image_class_labels.txt'),
                                          sep=' ', names=['img_id', 'target'])
-        train_test_split = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'zsl_split_20.txt'),
+        train_test_split = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', self.split),
                                        sep=' ', names=['img_id', 'is_training_img'])
 
         data = images.merge(image_class_labels, on='img_id')
@@ -42,6 +43,9 @@ class Cub2011(Dataset):
 
         self.data_unseen = self.data[self.data.is_training_img == 0]
         self.data = self.data[self.data.is_training_img == 1]
+
+        self.unseen_id = self.data[self.data.is_training_img == 1].target.unique()
+        self.seen_id = self.data[self.data.is_training_img == 1].target.unique()
 
     def _check_integrity(self):
         try:

@@ -1,5 +1,6 @@
 from random import randrange
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -79,14 +80,17 @@ class Flow(Transform):
             z = transform.inverse(z, context=context)
         return z
 
-    def centralizing_loss(self, data, targets, cs):
+    def centralizing_loss(self, data, targets, cs, seen_id):
         """
         Centralizing loss
         """
         padding = data.shape[1] - cs.shape[1]
         centralizing_loss = 0.0
         means = torch.stack([data[targets == t].mean(axis=0) for t in targets.unique()])
-        gens = self.generation(F.pad(cs[targets.unique()], (0, padding)))
+
+        idxs = [(seen_id == target).nonzero()[0][0] for target in np.asarray(targets.unique().to("cpu").detach())]
+
+        gens = self.generation(F.pad(cs[idxs], (0, padding)))
 
         return torch.norm(gens - means, dim=1).sum()
 

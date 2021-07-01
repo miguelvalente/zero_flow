@@ -25,18 +25,19 @@ import torchvision.transforms as transforms
 
 
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf.yaml')
 
-state = torch.load(f'{SAVE_PATH}resilient-snowball-40-18.pth')
+wandb.config['checkpoint'] = 'vocal-sweep-7-9.pth'
+config = wandb.config
+
+state = torch.load(f"{SAVE_PATH}{config['checkpoint']}")
 
 generator_config = state['config']
-
-config = wandb.config
 
 normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
                                      std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
@@ -129,21 +130,20 @@ run.watch(model)
 loss_fn = nn.CrossEntropyLoss().to(device)
 optimizer = optim.Adam(model.parameters(), lr=config['lr'])
 
-# epochs = tqdm.trange(1, config['epochs'])
 for epoch in range(config['epochs']):
     losses = []
     #  for batch_idx, (input, target) in enumerate(loader):
-    # for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
-    #     data = data.to(device)
-    #     targets = targets.to(device)
+    for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
+        data = data.to(device)
+        targets = targets.to(device)
 
-    #     optimizer.zero_grad()
-    #     output = model(data)
-    #     loss = loss_fn(output, targets)
-    #     loss.backward()
-    #     losses.append(loss.item())
-    #     optimizer.step()
-    #     wandb.log({"loss": loss})
+        optimizer.zero_grad()
+        output = model(data)
+        loss = loss_fn(output, targets)
+        loss.backward()
+        losses.append(loss.item())
+        optimizer.step()
+        wandb.log({"loss": loss.item()})
 
     if epoch % 5 == 0:
         with torch.no_grad():
@@ -168,19 +168,22 @@ for epoch in range(config['epochs']):
 
                 correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
                 correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
-                print(f'total_seen:{total_seen} | total_unseen:{total_unseen} = {total_unseen + total_seen}')
+                # print(f'total_seen:{total_seen} | total_unseen:{total_unseen} = {total_unseen + total_seen}')
 
-            # accuracy_seen = correct_seen / total_seen
-            # accuracy_unseen = correct_unseen / total_unseen
-            # harmonic_mean = 2 / (1 / accuracy_seen +
-            #                      1 / accuracy_unseen)
+            print(f'correct seen:{correct_seen}  correct unseen:{correct_unseen} | total s:{total_seen}  total u:{total_unseen}')
+            if correct_unseen != 0:
+                accuracy_seen = correct_seen / total_seen
+                accuracy_unseen = correct_unseen / total_unseen
+                harmonic_mean = 2 / (1 / accuracy_seen +
+                                     1 / accuracy_unseen)
 
-            # wandb.log({"Acc_seen": accuracy_seen,
-            #            "Acc_unseen": accuracy_unseen,
-            #            "Harmonic Mean": harmonic_mean})
+                wandb.log({"Acc_seen": accuracy_seen,
+                           "Acc_unseen": accuracy_unseen,
+                           "Harmonic Mean": harmonic_mean,
+                           "Epoch": epoch})
 
             cub.eval()  # Switch dataset return to img, target
 
-    # if loss.isnan():
-    #     print('Nan in loss!')
-    #     raise Exception('Nan in loss!')
+    if loss.isnan():
+        print('Nan in loss!')
+        raise Exception('Nan in loss!')

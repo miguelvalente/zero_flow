@@ -1,18 +1,18 @@
 epochs:
   desc: Number of epochs to train over
-  value: 31
+  value: 26
 batch_size:
   desc: Size of each batch
   value: 256
 lr:
   desc: Learning rate
-  value: 0.0005
+  value: 0.0004
 block_size:
   desc: Number of blocks
   value: 5
 hidden_dims:
   desc: Number of hidden dims and their dimensions
-  value: False
+  value: [4096]
 permuter:
   desc: type of permutation
   value: LinearLU # manual reverse random manual
@@ -54,22 +54,22 @@ image_encoder:
   value: resnet50d # efficientnet_b2
 summary_extraction_mode:
   desc: type of extraction mode
-  value: sum_tokens
+  value: mean_tokens
+aggregate_descriptions_method:
+  desc: another aggregation
+  value: mean_representations
 aggregate_long_text_splits_method:
   desc: type of aggregation
   value: mean
-aggregate_descriptions_method:
-  desc: another aggregation
-  value: sum_representations
 overlap_window:
   desc: how much overlap between articles
   value: 5
 max_length:
   desc: max length
   value: 10
-zero_split:
+split:
   desc: what split is being used
-  value: zsl_split_20 #easy_CUB2011 hard_CUB2011
+  value: easy_split.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
 
 
    

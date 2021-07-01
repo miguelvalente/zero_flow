@@ -26,7 +26,7 @@ class BaseEncoder:
                                         max_length=self.config['max_length'],
                                         overlap_window_length=self.config['overlap_window'],
                                         tokenize_func=self.tokenizer.tokenize)  # NOTE: This is not fully correct. Has issues with sub-words
-    # (results do not differ much, however).
+        # (results do not differ much, however).
 
         encoded_splits = None
         _from = 0
@@ -83,6 +83,25 @@ class BartEncoder(BaseEncoder):
 
         return self.extract_text_summary(outputs['encoder_last_hidden_state'], inputs['attention_mask'])
 
+class ProphetNet(BaseEncoder):
+    def __init__(self, config, device):
+        self.config = config
+        self.device = device
+        self.tokenizer = ProphetNetTokenizer.from_pretrained('microsoft/prophetnet-large-uncased')
+        self.model = ProphetNetEncoder.from_pretrained('patrickvonplaten/prophetnet-large-uncased-standalone')
+        self.model = self.model.to(device)
+        self.summary_extraction_mode = self.config['summary_extraction_mode']
+
+    def __call__(self, input_texts, **kwargs):
+        inputs = self.tokenizer.batch_encode_plus(input_texts,
+                                                  add_special_tokens=True,
+                                                  return_tensors='pt',
+                                                  padding=True).to(self.device)
+
+        outputs = self.model(input_ids=inputs['input_ids'], attention_mask=inputs['attention_mask'])
+
+        return self.extract_text_summary(outputs['last_hidden_state'], inputs['attention_mask'])
+
 class AlbertEncoder(BaseEncoder):
     def __init__(self, config, device):
         self.config = config
@@ -118,22 +137,3 @@ class AlbertEncoder(BaseEncoder):
         else:
             # TODO - try other methods
             raise NotImplementedError()
-
-class ProphetNet(BaseEncoder):
-    def __init__(self, config, device):
-        self.config = config
-        self.device = device
-        self.tokenizer = ProphetNetTokenizer.from_pretrained('microsoft/prophetnet-large-uncased')
-        self.model = ProphetNetEncoder.from_pretrained('patrickvonplaten/prophetnet-large-uncased-standalone')
-        self.model = self.model.to(device)
-        self.summary_extraction_mode = self.config['summary_extraction_mode']
-
-    def __call__(self, input_texts, **kwargs):
-        inputs = self.tokenizer.batch_encode_plus(input_texts,
-                                                  add_special_tokens=True,
-                                                  return_tensors='pt',
-                                                  padding=True).to(self.device)
-
-        outputs = self.model(input_ids=inputs['input_ids'], attention_mask=inputs['attention_mask'])
-
-        return self.extract_text_summary(outputs['last_hidden_state'], inputs['attention_mask'])
