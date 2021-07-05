@@ -19,7 +19,7 @@ from PIL import Image
 from nets import Classifier
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
-from convert import CostumTransform
+from convert import VisualExtractor
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
@@ -32,11 +32,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf.yaml')
 
-wandb.config['checkpoint'] = 'vocal-sweep-7-9.pth'
+wandb.config['checkpoint'] = 'still-haze-99-100.pth'
+state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
+wandb.config['split'] = state['split']
+
 config = wandb.config
-
-state = torch.load(f"{SAVE_PATH}{config['checkpoint']}")
-
 generator_config = state['config']
 
 normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
@@ -50,10 +50,10 @@ transforms_cub = transforms.Compose([
     transforms.ToTensor(),
     normalize_cub,
     transforms.ToPILImage(mode='RGB'),
-    CostumTransform(generator_config['image_encoder'])
+    VisualExtractor(generator_config['image_encoder'])
 ])
 
-cub = Cub2011(root='/project/data/', transform=transforms_cub, download=False)
+cub = Cub2011(root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
 seen_ids = list(set(cub.data['target']))
 unseen_ids = list(set(cub.data_unseen['target']))
 
@@ -159,8 +159,8 @@ for epoch in range(config['epochs']):
             for data_val, target_val, seen_or_unseen in tqdm.tqdm(val_loader, desc="Validation"):
                 images = data_val.to(device)
                 labels = target_val.to(device)
-                outputs = model(images)
 
+                outputs = model(images)
                 _, predicted = torch.max(outputs, 1)
 
                 total_seen += seen_or_unseen[seen_or_unseen == 1].numel()

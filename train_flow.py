@@ -18,7 +18,7 @@ import timm
 from PIL import Image
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
-from convert import CostumTransform
+from convert import VisualExtractor
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
@@ -40,12 +40,7 @@ normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0
 #                                           std=[0.229, 0.224, 0.225])
 
 transforms_cub = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    normalize_cub,
-    transforms.ToPILImage(mode='RGB'),
-    CostumTransform(config['image_encoder'])
+    VisualExtractor(config['image_encoder'])
 ])
 
 cub = Cub2011(root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
@@ -136,7 +131,7 @@ for epoch in range(1, config['epochs']):
     run.log({"epoch": epoch})
     print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')
 
-    if epoch % 2 == 0:
+    if epoch % 20 == 0:
         state = {'config': config.as_dict(),
                  'split': config['split'],
                  'state_dict': model.state_dict()}

@@ -3,7 +3,8 @@ from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 import torch
 
-class CostumTransform(object):
+class VisualExtractor(object):
+    '''Class used in transforms to extract visual features from pretrained networks '''
     def __init__(self, model):
         self.model = timm.create_model(model, pretrained=True, num_classes=0)
         self.model.eval()

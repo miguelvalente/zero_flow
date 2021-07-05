@@ -117,23 +117,8 @@ class Flow(Transform):
         return mmd_loss
 
     def inverse_quadratic(self, data1, data2):
-        part1 = (2 * data1.shape[1])
-
-        dist = torch.cdist(data1, data2)
-        # if torch.isnan(dist).any():
-        #     print('Nan in loss!')
-        #     print(dist.max())
-
-        part2 = 2 * data1.shape[1] + dist.square()
-        # if torch.isnan(part2).any():
-        #     print('Nan in loss!')
-        #     print(dist.square.max())
-
-        final = part1 / part2
-        # if torch.isnan(final).any():
-        #     print('Nan in loss!')
-        #        return (2 * data1.shape[1]) / (2 * data1.shape[1] + torch.cdist(data1, data2).square())
-        return final
+        return (2 * data1.shape[1]) / (2 * data1.shape[1] + torch.cdist(data1, data2).square())
+        #return final
 
 class IdentityTransform(Transform):
     def __init__(self):

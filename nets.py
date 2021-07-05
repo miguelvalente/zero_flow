@@ -57,8 +57,7 @@ class Classifier(nn.Module):
             raise NotImplementedError
         else:
             self.classifier = nn.Linear(input_dim, output_dim)
-        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, input_data):
-        output = self.softmax(self.classifier(input_data))
+        output = self.classifier(input_data)
         return output

@@ -46,17 +46,16 @@ class Cub2011(Dataset):
         self.seen_len = len(self.data)
 
         self.data = pd.concat([self.data, self.data_unseen])
-        # self.targets = list(self.data.target)
-        # self.seen_unseens = list(self.data.is_training_img)
-        
-        # img_paths = [os.path.join(self.root, self.base_folder,img) for img in list(self.data.filepath)]
-        # self
-        # for img in tqdm(img_paths, desc="Extracting Visual Features"):
-        #     img = self.loader(img)
-        #     if self.transform is not None:
-        #         img = self.transform(img)
+        self.targets = list(self.data.target)
+        self.seen_unseen = list(self.data.is_training_img)
 
-
+        img_paths = [os.path.join(self.root, self.base_folder, img) for img in list(self.data.filepath)]
+        self.visual_features = []
+        for img in tqdm(img_paths, desc="Extracting Visual Features"):
+            img = self.loader(img)
+            if self.transform is not None:
+                img = self.transform(img)
+            self.visual_features.append(img)
 
     def _check_integrity(self):
         try:
@@ -88,13 +87,16 @@ class Cub2011(Dataset):
 
     def __getitem__(self, idx):
         if self.evaluation:
-            sample = self.data.iloc[idx]
-            path = os.path.join(self.root, self.base_folder, sample.filepath)
-            target = sample.target - 1  # Targets start at 1 by default, so shift to 0
-            img = self.loader(path)
-            seen_or_unseen = sample.is_training_img
-            if self.transform is not None:
-                img = self.transform(img)
+            img = self.visual_features[idx]
+            target = self.targets[idx] - 1
+            seen_or_unseen = self.seen_unseen[idx]
+            # sample = self.data.iloc[idx]
+            # path = os.path.join(self.root, self.base_folder, sample.filepath)
+            # target = sample.target - 1  # Targets start at 1 by default, so shift to 0
+            # img = self.loader(path)
+            # seen_or_unseen = sample.is_training_img
+            # if self.transform is not None:
+            #     img = self.transform(img)
 
             return img, target, seen_or_unseen  # unseen = 1 / seen = 0
         else:
@@ -103,12 +105,14 @@ class Cub2011(Dataset):
                 target = self.data_generated_features_targets[idx] - 1  # Targets start at 1 by default, so shift to 0
                 img = self.data_generated_features[idx]
             else:
-                sample = self.data.iloc[idx]
-                path = os.path.join(self.root, self.base_folder, sample.filepath)
-                target = sample.target - 1  # Targets start at 1 by default, so shift to 0
-                img = self.loader(path)
-                if self.transform is not None:
-                    img = self.transform(img)
+                img = self.visual_features[idx]
+                target = self.targets[idx] - 1
+                # sample = self.data.iloc[idx]
+                # path = os.path.join(self.root, self.base_folder, sample.filepath)
+                # target = sample.target - 1  # Targets start at 1 by default, so shift to 0
+                # img = self.loader(path)
+                # if self.transform is not None:
+                #     img = self.transform(img)
 
             return img, target
 
@@ -130,9 +134,8 @@ class Cub2011(Dataset):
 
     def eval(self):
         '''Function to set self.evaluation True and False to change __getitem__() return'''
-        if self.evaluation:
-            self.evaluation = False
-        else:
-            self.evaluation = True
-
-       # self.evaluation = True if self.evaluation else False
+        self.evaluation = False if self.evaluation else True
+        # if self.evaluation:
+        #     self.evaluation = False
+        # else:
+        #     self.evaluation = True

@@ -1,6 +1,6 @@
 import os
 
-import tqdm
+from tqdm import tqdm
 import pandas as pd
 import torch
 from torchvision.datasets.folder import default_loader
@@ -47,6 +47,16 @@ class Cub2011(Dataset):
         self.unseen_id = self.data[self.data.is_training_img == 1].target.unique()
         self.seen_id = self.data[self.data.is_training_img == 1].target.unique()
 
+        self.targets = list(self.data.target)
+
+        img_paths = [os.path.join(self.root, self.base_folder, img) for img in list(self.data.filepath)]
+        self.visual_features = []
+        for img in tqdm(img_paths, desc="Extracting Visual Features"):
+            img = self.loader(img)
+            if self.transform is not None:
+                img = self.transform(img)
+            self.visual_features.append(img)
+
     def _check_integrity(self):
         try:
             self._load_metadata()
@@ -76,12 +86,14 @@ class Cub2011(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        sample = self.data.iloc[idx]
-        path = os.path.join(self.root, self.base_folder, sample.filepath)
-        target = sample.target - 1  # Targets start at 1 by default, so shift to 0
-        img = self.loader(path)
+        img = self.visual_features[idx]
+        target = self.targets[idx] - 1
+        # sample = self.data.iloc[idx]
+        # path = os.path.join(self.root, self.base_folder, sample.filepath)
+        # target = sample.target - 1  # Targets start at 1 by default, so shift to 0
+        # img = self.loader(path)
 
-        if self.transform is not None:
-            img = self.transform(img)
+        # if self.transform is not None:
+        #     img = self.transform(img)
 
         return img, target
