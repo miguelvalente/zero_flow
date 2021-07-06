@@ -10,6 +10,9 @@ class VisualExtractor(object):
         self.model = timm.create_model(model, pretrained=True, num_classes=0)
         self.model.eval()
 
+        # normalize_imagenet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+        #                                           std=[0.229, 0.224, 0.225])
+
         normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
                                              std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
 

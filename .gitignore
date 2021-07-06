@@ -1,5 +1,5 @@
 data
-docker/
+#docker/
 wandb/
 checkpoints/
 test.py

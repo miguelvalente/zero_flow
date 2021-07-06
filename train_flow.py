@@ -34,9 +34,6 @@ run = wandb.init(project='zero_flow_CUB', entity='mvalente',
 
 config = wandb.config
 
-# normalize_imagenet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-#                                           std=[0.229, 0.224, 0.225])
-
 transforms_cub = transforms.Compose([
     VisualExtractor(config['image_encoder'])
 ])
@@ -52,8 +49,8 @@ cu = context_encoder.cu.to(device)
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-cub_val = Cub2011(which_split='val', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
-val_loader = torch.utils.data.DataLoader(cub_val, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
+# cub_val = Cub2011(which_split='val', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
+# val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
 
 input_dim = cub_train[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
@@ -128,7 +125,16 @@ for epoch in range(1, config['epochs']):
                  "loss_mmd": mmd_loss.item()})
 
     with torch.no_grad():
-        pass
+        for data_val, targets_val in tqdm.tqdm(val_loader, desc=f'Validation Epoch({epoch})'):
+            data_val = data_val.to(device)
+            targets_val = targets_val.to(device)
+
+            loss_flow_val = - model.log_prob(data_val, targets_val).mean() * config['wt_f_l']
+            centralizing_loss_val = model.centralizing_loss(data_val, targets_val, cs, seen_id) * config['wt_c_l']
+            mmd_loss_val = model.mmd_loss(data_val, cu) * config['wt_mmd_l']
+            loss_val = loss_flow + centralizing_loss + mmd_loss
+
+            run.log({"loss_val": loss_val.item()})
 
     run.log({"epoch": epoch})
     print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')

@@ -54,14 +54,15 @@ class Cub2011(Dataset):
         else:
             print('Split role not defined')
 
-        self.targets = list(self.data.target)
         img_paths = [os.path.join(self.root, self.base_folder, img) for img in list(self.data.filepath)]
         self.visual_features = []
-        for img in tqdm(img_paths, desc="Extracting Visual Features"):
+        for img in tqdm(img_paths, desc=f"({self.which_split}): Extracting Visual Features"):
             img = self.loader(img)
             if self.transform is not None:
                 img = self.transform(img)
             self.visual_features.append(img)
+
+        self.targets = list(self.data.target)
 
     def _check_integrity(self):
         try:

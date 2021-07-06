@@ -1,0 +1,22 @@
+services:
+  simoesvalentema:
+    runtime: nvidia
+    command: /usr/sbin/sshd -D
+    image: flow
+    ports:
+     - "8001:22"
+    environment:
+    - LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64/stubs/
+    - XDG_DATA_HOME=$HOME
+    - XDG_CONFIG_HOME=$HOME/.config
+    - HOME=$HOME
+    - USER=$USER
+    - NVIDIA_VISIBLE_DEVICES=1
+    volumes:
+    - /data/$USER/gitlab:/gitlab
+    - /usr/local/certificates:/certificates
+    - $HOME:$HOME
+    - $PWD:/project
+    - $HOME/.ssh/authorized_keys:/root/.ssh/authorized_keys
+ 
+version: '2.3'

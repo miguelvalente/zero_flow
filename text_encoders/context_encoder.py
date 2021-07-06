@@ -12,7 +12,7 @@ class ContextEncoder():
     def __init__(self, config, seen_id, unseen_id, device, generation=False):
         self.config = config
         self.device = device
-        self.seen_id = np.array(seen_id) 
+        self.seen_id = np.array(seen_id)
         self.unseen_id = np.array(unseen_id)
         self.generation = generation
 
