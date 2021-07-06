@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 202
+  value: 400
 batch_size:
   desc: Size of each batch
   value: 256
@@ -69,7 +69,7 @@ max_length:
   value: 10
 split:
   desc: what split is being used
-  value: easy_split.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
+  value: proposed_split1.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
 
 
    

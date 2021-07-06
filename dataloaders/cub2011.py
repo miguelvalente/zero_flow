@@ -15,8 +15,9 @@ class Cub2011(Dataset):
     filename = 'CUB_200_2011.tgz'
     tgz_md5 = '97eceeb196236b17998738112f37df78'
 
-    def __init__(self, root, split='easy_split.txt', transform=None, loader=default_loader, download=True):
+    def __init__(self, root, which_split, split='easy_split.txt', transform=None, loader=default_loader, download=True):
         self.root = os.path.expanduser(root)
+        self.which_split = which_split
         self.split = split
         self.transform = transform
         self.loader = default_loader
@@ -41,14 +42,19 @@ class Cub2011(Dataset):
         data = images.merge(image_class_labels, on='img_id')
         self.data = data.merge(train_test_split, on='img_id')
 
-        self.data_unseen = self.data[self.data.is_training_img == 0]
-        self.data = self.data[self.data.is_training_img == 1]
+        self.unseen_id = self.data[self.data.is_training_img == 0].target.unique() - 1
+        self.seen_id = self.data[self.data.is_training_img == 1].target.unique() - 1
 
-        self.unseen_id = self.data[self.data.is_training_img == 1].target.unique()
-        self.seen_id = self.data[self.data.is_training_img == 1].target.unique()
+        if self.which_split == 'train':
+            self.data = self.data[self.data.is_training_img == 1]
+        elif self.which_split == 'val':
+            self.data = self.data[self.data.is_training_img == 0]
+        elif self.which_split == 'test':
+            self.data = self.data[self.data.is_training_img == 2]
+        else:
+            print('Split role not defined')
 
         self.targets = list(self.data.target)
-
         img_paths = [os.path.join(self.root, self.base_folder, img) for img in list(self.data.filepath)]
         self.visual_features = []
         for img in tqdm(img_paths, desc="Extracting Visual Features"):

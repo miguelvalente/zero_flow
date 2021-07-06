@@ -25,7 +25,7 @@ import torchvision.transforms as transforms
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'online'
+os.environ['WANDB_MODE'] = 'offline'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,8 +34,6 @@ run = wandb.init(project='zero_flow_CUB', entity='mvalente',
 
 config = wandb.config
 
-normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
-                                     std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
 # normalize_imagenet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
 #                                           std=[0.229, 0.224, 0.225])
 
@@ -43,20 +41,21 @@ transforms_cub = transforms.Compose([
     VisualExtractor(config['image_encoder'])
 ])
 
-cub = Cub2011(root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
-seen_id = cub.seen_id - 1
-unseen_id = cub.unseen_id
+cub_train = Cub2011(which_split='train', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
+seen_id = cub_train.seen_id
+unseen_id = cub_train.unseen_id
 
 context_encoder = ContextEncoder(config, seen_id, unseen_id, device)
 contexts = context_encoder.contexts.to(device)
 cs = context_encoder.cs.to(device)
 cu = context_encoder.cu.to(device)
 
-#  Free CUDA memoery from text encoder
+train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
+cub_val = Cub2011(which_split='val', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
+val_loader = torch.utils.data.DataLoader(cub_val, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-input_dim = cub[0][0].shape.numel()
+input_dim = cub_train[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
@@ -127,6 +126,9 @@ for epoch in range(1, config['epochs']):
                  "loss_flow": loss_flow.item(),  # }, step=epoch)
                  "loss_central": centralizing_loss.item(),  # }, step=epoch)
                  "loss_mmd": mmd_loss.item()})
+
+    with torch.no_grad():
+        pass
 
     run.log({"epoch": epoch})
     print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')

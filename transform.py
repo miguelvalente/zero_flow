@@ -118,7 +118,6 @@ class Flow(Transform):
 
     def inverse_quadratic(self, data1, data2):
         return (2 * data1.shape[1]) / (2 * data1.shape[1] + torch.cdist(data1, data2).square())
-        #return final
 
 class IdentityTransform(Transform):
     def __init__(self):

@@ -2,6 +2,7 @@ import timm
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 import torch
+import torchvision.transforms as transforms
 
 class VisualExtractor(object):
     '''Class used in transforms to extract visual features from pretrained networks '''
@@ -9,8 +10,12 @@ class VisualExtractor(object):
         self.model = timm.create_model(model, pretrained=True, num_classes=0)
         self.model.eval()
 
+        normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
+                                             std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
+
         config = resolve_data_config({}, model=self.model)
         self.transform = create_transform(**config)
+        self.transform.transforms[-1] = normalize_cub
 
     def __call__(self, sample):
         tensor = self.transform(sample).unsqueeze(0)

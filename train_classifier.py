@@ -32,7 +32,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf.yaml')
 
-wandb.config['checkpoint'] = 'still-haze-99-100.pth'
+wandb.config['checkpoint'] = 'absurd-gorge-100-200.pth'
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
 
@@ -45,11 +45,6 @@ normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0
 #                                           std=[0.229, 0.224, 0.225])
 
 transforms_cub = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    normalize_cub,
-    transforms.ToPILImage(mode='RGB'),
     VisualExtractor(generator_config['image_encoder'])
 ])
 
@@ -145,7 +140,7 @@ for epoch in range(config['epochs']):
         optimizer.step()
         wandb.log({"loss": loss.item()})
 
-    if epoch % 5 == 0:
+    if epoch % 10 == 0:
         with torch.no_grad():
             correct_seen = 0
             correct_unseen = 0
