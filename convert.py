@@ -18,7 +18,7 @@ class VisualExtractor(object):
 
         config = resolve_data_config({}, model=self.model)
         self.transform = create_transform(**config)
-        self.transform.transforms[-1] = normalize_cub
+      #  self.transform.transforms[-1] = normalize_cub
 
     def __call__(self, sample):
         tensor = self.transform(sample).unsqueeze(0)

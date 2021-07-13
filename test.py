@@ -24,11 +24,11 @@ import torchvision.models as models
 import yaml
 from nets import Classifier
 from text_encoders.context_encoder import ContextEncoder
-from dataloaders.cub2011 import Cub2011
-from convert import CostumTransform
+from dataloaders.cub2011_zero import Cub2011
+from convert import VisualExtractor
 
 os.environ['WANDB_MODE'] = 'offline'
-device = 'cpu' # torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
                  config=r'config/flow_conf.yaml')
 
@@ -40,19 +40,14 @@ normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0
 #                                           std=[0.229, 0.224, 0.225])
 
 transforms_cub = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    normalize_cub,
-    transforms.ToPILImage(mode='RGB'),
-    CostumTransform(config['image_encoder'])
+    VisualExtractor('resnet50d')
 ])
 
 cub = Cub2011(root='/project/data/', transform=transforms_cub, download=False)
-seen_id = list(set(cub.data['target']))
-unseen_id = list(set(cub.data_unseen['target']))
+seen_ids = cub.seen_ids
+unseen_ids = cub.unseen_ids
 
-context_encoder = ContextEncoder(config, seen_id, unseen_id, device)
+context_encoder = ContextEncoder(config, seen_ids, unseen_ids, device)
 contexts = context_encoder.contexts.to(device)
 cs = context_encoder.cs.to(device)
 cu = context_encoder.cu.to(device)

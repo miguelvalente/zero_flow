@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 400
+  value: 1001
 batch_size:
   desc: Size of each batch
   value: 256
@@ -45,7 +45,7 @@ image_net_dir:
   value: /project/data/image_net/train
 text_encoder:
   desc: which text encoder to use
-  value: bart #albert  # prophet_net
+  value: albert #bart #albert  # prophet_net
 model_name:
   desc: model name of text encoder
   value: albert-base-v2 # albert-xxlarge-v2

@@ -25,7 +25,7 @@ import torchvision.transforms as transforms
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -42,15 +42,16 @@ cub_train = Cub2011(which_split='train', root='/project/data/', split=config['sp
 seen_id = cub_train.seen_id
 unseen_id = cub_train.unseen_id
 
-context_encoder = ContextEncoder(config, seen_id, unseen_id, device)
+context_encoder = ContextEncoder(config, seen_id=seen_id, unseen_id=unseen_id, device=device)
 contexts = context_encoder.contexts.to(device)
 cs = context_encoder.cs.to(device)
 cu = context_encoder.cu.to(device)
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-# cub_val = Cub2011(which_split='val', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
-# val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
+cub_val = Cub2011(which_split='test', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
+val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
+test_id = cub_val.test_id
 
 input_dim = cub_train[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
@@ -106,7 +107,12 @@ for epoch in range(1, config['epochs']):
         targets = targets.to(device)
 
         optimizer.zero_grad()
-        loss_flow = - model.log_prob(data, targets).mean() * config['wt_f_l']
+        # loss_flow, lg, ldj = - model.log_prob(data, targets).mean() * config['wt_f_l']
+        log_prob, lg, ldj = model.log_prob(data, targets)
+        ldj = ldj.mean()
+        lg = lg.mean()
+
+        loss_flow = - log_prob.mean() * config['wt_f_l']
         centralizing_loss = model.centralizing_loss(data, targets, cs, seen_id) * config['wt_c_l']
         mmd_loss = model.mmd_loss(data, cu) * config['wt_mmd_l']
         loss = loss_flow + centralizing_loss + mmd_loss
@@ -122,24 +128,33 @@ for epoch in range(1, config['epochs']):
         run.log({"loss": loss.item(),
                  "loss_flow": loss_flow.item(),  # }, step=epoch)
                  "loss_central": centralizing_loss.item(),  # }, step=epoch)
-                 "loss_mmd": mmd_loss.item()})
+                #  "loss_mmd": mmd_loss.item()})
+                 "loss_mmd": mmd_loss.item(),
+                 "ldj": ldj.item(),  # }, step=epoch)
+                 "lg": lg.item()})
 
     with torch.no_grad():
+        loss_flow_val = 0
+        centralizing_loss_val = 0
+        mmd_loss_val = 0
+        loss_val = 0
+        losses_val = []
         for data_val, targets_val in tqdm.tqdm(val_loader, desc=f'Validation Epoch({epoch})'):
             data_val = data_val.to(device)
             targets_val = targets_val.to(device)
 
-            loss_flow_val = - model.log_prob(data_val, targets_val).mean() * config['wt_f_l']
-            centralizing_loss_val = model.centralizing_loss(data_val, targets_val, cs, seen_id) * config['wt_c_l']
+            log_prob, _, _ = model.log_prob(data, targets)
+            loss_flow_val = - log_prob.mean() * config['wt_f_l']
+            centralizing_loss_val = model.centralizing_loss(data_val, targets_val, cs, test_id) * config['wt_c_l']
             mmd_loss_val = model.mmd_loss(data_val, cu) * config['wt_mmd_l']
             loss_val = loss_flow + centralizing_loss + mmd_loss
+            losses_val.append(loss_val.item())
 
-            run.log({"loss_val": loss_val.item()})
-
+    run.log({"loss_val": sum(losses_val) / len(losses_val)})
     run.log({"epoch": epoch})
     print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')
 
-    if epoch % 20 == 0:
+    if epoch % 100 == 0:
         state = {'config': config.as_dict(),
                  'split': config['split'],
                  'state_dict': model.state_dict()}

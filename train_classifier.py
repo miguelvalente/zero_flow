@@ -1,4 +1,6 @@
 import os
+
+import numpy as np
 import torch
 import wandb
 from transform import Flow
@@ -10,7 +12,6 @@ from affine_coupling import AffineCoupling
 import torch.optim as optim
 import torch.distributions as dist
 from act_norm import ActNormBijection
-from text_encoders.text_encoder import ProphetNet
 from text_encoders.context_encoder import ContextEncoder
 from dataloaders.cub2011_zero import Cub2011
 
@@ -23,16 +24,16 @@ from convert import VisualExtractor
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
-
+CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'online'
+os.environ['WANDB_MODE'] = 'offline'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf.yaml')
 
-wandb.config['checkpoint'] = 'absurd-gorge-100-200.pth'
+wandb.config['checkpoint'] = 'sandy-cosmos-121-400.pth'
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
 
@@ -48,16 +49,15 @@ transforms_cub = transforms.Compose([
     VisualExtractor(generator_config['image_encoder'])
 ])
 
-cub = Cub2011(root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
-seen_ids = list(set(cub.data['target']))
-unseen_ids = list(set(cub.data_unseen['target']))
+cub = Cub2011(root='/project/data/', test=config['test'], split=config['split'], transform=transforms_cub, download=False)
+generation_ids = cub.generation_ids
+imgs_per_class = cub.imgs_per_class
 
-context_encoder = ContextEncoder(generator_config, seen_ids, unseen_ids, device, generation=True)
-cu = context_encoder.cu.to(device)
+context_encoder = ContextEncoder(generator_config, generation_id=generation_ids, device=device, generation=True)
+contexts = context_encoder.contexts.to(device)
 
-
-input_dim = cub[0][0].shape.numel()
-context_dim = cu[0].shape.numel()
+input_dim = 2048  # cub[0][0].shape.numel()
+context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
@@ -96,15 +96,19 @@ generator.load_state_dict(state['state_dict'])
 generator = generator.to(device)
 generator.eval()
 
-generated_unseen_features = []
-number_samples = 60
+generated_features = []
+labels = []
 with torch.no_grad():
-    for cu_ in tqdm.tqdm(cu, desc="Generating Unseen Features"):
-        generated_unseen_features.append(generator.generation(
-            torch.hstack((cu_.repeat(number_samples).reshape(-1, context_dim),
+    for idx, class_id in enumerate(tqdm.tqdm(generation_ids, desc='Generating Features')):
+        number_samples = imgs_per_class[class_id]
+        generated_features.append(generator.generation(
+            torch.hstack((contexts[idx].repeat(number_samples).reshape(-1, context_dim),
                           visual_distribution.sample([number_samples])))))
-generated_unseen_features = torch.stack(generated_unseen_features).to('cpu')
-cub.insert_generated_features(generated_unseen_features, number_samples)
+
+generated_features = torch.cat(generated_features, dim=0).to('cpu')
+
+labels = list(np.concatenate([np.repeat(idx, imgs_per_class[class_id]) for idx, class_id in enumerate(ids)]))
+cub.insert_generated_features(generated_features, labels)
 
 try:  # Deletes genererator model since its not used anymore
     del generator
@@ -144,10 +148,13 @@ for epoch in range(config['epochs']):
         with torch.no_grad():
             correct_seen = 0
             correct_unseen = 0
+            correct_test = 0
             total_seen = 0
             total_unseen = 0
+            total_test = 0
             accuracy_seen = 0
             accuracy_unseen = 0
+            accuracy_test = 0
             harmonic_mean = 0
 
             cub.eval()  # Switch dataset return to img, target, seen_or_unseen
@@ -160,25 +167,33 @@ for epoch in range(config['epochs']):
 
                 total_seen += seen_or_unseen[seen_or_unseen == 1].numel()
                 total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
+                total_test += seen_or_unseen[seen_or_unseen == 2].numel()
 
                 correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
                 correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
-                # print(f'total_seen:{total_seen} | total_unseen:{total_unseen} = {total_unseen + total_seen}')
+                correct_test += (predicted[seen_or_unseen == 2] == labels[seen_or_unseen == 2]).sum().item()
 
             print(f'correct seen:{correct_seen}  correct unseen:{correct_unseen} | total s:{total_seen}  total u:{total_unseen}')
-            if correct_unseen != 0:
-                accuracy_seen = correct_seen / total_seen
-                accuracy_unseen = correct_unseen / total_unseen
+
+            accuracy_seen = correct_seen / total_seen
+            accuracy_unseen = correct_unseen / total_unseen
+            if accuracy_seen != 0 and accuracy_unseen != 0:
                 harmonic_mean = 2 / (1 / accuracy_seen +
                                      1 / accuracy_unseen)
 
-                wandb.log({"Acc_seen": accuracy_seen,
-                           "Acc_unseen": accuracy_unseen,
-                           "Harmonic Mean": harmonic_mean,
-                           "Epoch": epoch})
+            if correct_test != 0:
+                accuracy_test = correct_test / total_test
+
+            wandb.log({"Acc_seen": accuracy_seen,
+                       "Acc_unseen": accuracy_unseen,
+                       "Harmonic Mean": harmonic_mean,
+                       "Epoch": epoch})
+
+            if config['test']:
+                wandb.log({"Acc_test": accuracy_test})
 
             cub.eval()  # Switch dataset return to img, target
-
+    print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')
     if loss.isnan():
         print('Nan in loss!')
         raise Exception('Nan in loss!')

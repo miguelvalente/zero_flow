@@ -9,11 +9,12 @@ from text_encoders.text_encoder import AlbertEncoder, ProphetNet, BartEncoder
 import yaml
 
 class ContextEncoder():
-    def __init__(self, config, seen_id, unseen_id, device, generation=False):
+    def __init__(self, config, generation_ids=None, seen_id=None, unseen_id=None, device='cpu', generation=False):
         self.config = config
         self.device = device
         self.seen_id = np.array(seen_id)
         self.unseen_id = np.array(unseen_id)
+        self.generation_ids = np.array(generation_ids)
         self.generation = generation
 
         if self.config['text_encoder'] == 'prophet_net':
@@ -44,15 +45,16 @@ class ContextEncoder():
         articles = [open(f'{dira}/{file}').read() for file in file_list_ordered]
 
         if self.generation:
-            articles = [articles[i] for i in self.unseen_id]
+            articles = [articles[i] for i in self.generation_ids]
             semantic = tqdm(articles, desc='Encoding Unseen Classes Semantic Descriptions CUB2011')
 
-            self.cu = [torch.from_numpy(self.text_encoder.encode_long_text(article)) for article in semantic]
-            self.cu = torch.stack(self.cu)
+            self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)) for article in semantic]
+            self.contexts = torch.stack(self.contexts)
         else:
             semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
 
             self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)) for article in semantic]
+            # self.contexts = torch.ones((200, 1024))
 
             self.contexts = torch.stack(self.contexts)
             self.cs = self.contexts[self.seen_id]

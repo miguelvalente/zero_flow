@@ -51,6 +51,7 @@ class Cub2011(Dataset):
             self.data = self.data[self.data.is_training_img == 0]
         elif self.which_split == 'test':
             self.data = self.data[self.data.is_training_img == 2]
+            self.test_id = self.data[self.data.is_training_img == 2].target.unique() - 1
         else:
             print('Split role not defined')
 
@@ -61,7 +62,7 @@ class Cub2011(Dataset):
             if self.transform is not None:
                 img = self.transform(img)
             self.visual_features.append(img)
-
+        # self.visual_features = torch.ones((10000, 2048))
         self.targets = list(self.data.target)
 
     def _check_integrity(self):
@@ -95,12 +96,5 @@ class Cub2011(Dataset):
     def __getitem__(self, idx):
         img = self.visual_features[idx]
         target = self.targets[idx] - 1
-        # sample = self.data.iloc[idx]
-        # path = os.path.join(self.root, self.base_folder, sample.filepath)
-        # target = sample.target - 1  # Targets start at 1 by default, so shift to 0
-        # img = self.loader(path)
-
-        # if self.transform is not None:
-        #     img = self.transform(img)
 
         return img, target
