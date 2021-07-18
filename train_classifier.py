@@ -1,44 +1,47 @@
 import os
 
 import numpy as np
-import torch
-import wandb
-from transform import Flow
-import tqdm
-from distributions import DoubleDistribution, SemanticDistribution
-from permuters import LinearLU, Permuter, Reverse
-import torch.nn as nn
-from affine_coupling import AffineCoupling
-import torch.optim as optim
-import torch.distributions as dist
-from act_norm import ActNormBijection
-from text_encoders.context_encoder import ContextEncoder
-from dataloaders.cub2011_zero import Cub2011
-
 import timm
-from PIL import Image
-from nets import Classifier
-from timm.data import resolve_data_config
-from timm.data.transforms_factory import create_transform
-from convert import VisualExtractor
+import torch
+import torch.distributions as dist
+import torch.nn as nn
+import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+import tqdm
+from PIL import Image
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
+
+import wandb
+from act_norm import ActNormBijection
+from affine_coupling import AffineCoupling
+from convert import VisualExtractor
+from dataloaders.cub2011_zero import Cub2011
+from distributions import DoubleDistribution, SemanticDistribution
+from nets import Classifier
+from permuters import LinearLU, Permuter, Reverse
+from text_encoders.context_encoder import ContextEncoder
+from transform import Flow
 
 CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf.yaml')
 
-wandb.config['checkpoint'] = 'sandy-cosmos-121-400.pth'
+wandb.config['checkpoint'] = 'legendary-donkey-133-180.pth'
+
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
 
 config = wandb.config
 generator_config = state['config']
+wandb.config['text_encoder'] = generator_config['text_encoder']
+wandb.config['image_encoder'] = generator_config['image_encoder']
 
 normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
                                      std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
@@ -49,11 +52,11 @@ transforms_cub = transforms.Compose([
     VisualExtractor(generator_config['image_encoder'])
 ])
 
-cub = Cub2011(root='/project/data/', test=config['test'], split=config['split'], transform=transforms_cub, download=False)
+cub = Cub2011(root='/project/data/', test=config['test'], split=config['split'], config=config, transform=transforms_cub, download=False)
 generation_ids = cub.generation_ids
 imgs_per_class = cub.imgs_per_class
 
-context_encoder = ContextEncoder(generator_config, generation_id=generation_ids, device=device, generation=True)
+context_encoder = ContextEncoder(generator_config, generation_ids=generation_ids, device=device, generation=True)
 contexts = context_encoder.contexts.to(device)
 
 input_dim = 2048  # cub[0][0].shape.numel()
@@ -107,7 +110,7 @@ with torch.no_grad():
 
 generated_features = torch.cat(generated_features, dim=0).to('cpu')
 
-labels = list(np.concatenate([np.repeat(idx, imgs_per_class[class_id]) for idx, class_id in enumerate(ids)]))
+labels = list(np.concatenate([np.repeat(idx, imgs_per_class[class_id]) for idx, class_id in enumerate(generation_ids)]))
 cub.insert_generated_features(generated_features, labels)
 
 try:  # Deletes genererator model since its not used anymore
@@ -126,25 +129,32 @@ model = model.to(device)
 print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameters()])}')
 run.watch(model)
 
-loss_fn = nn.CrossEntropyLoss().to(device)
+loss_fn = nn.CrossEntropyLoss(reduction="none").to(device)
 optimizer = optim.Adam(model.parameters(), lr=config['lr'])
-
+tau = config['tau']
+tau = torch.tensor(tau).to(device)
 for epoch in range(config['epochs']):
     losses = []
     #  for batch_idx, (input, target) in enumerate(loader):
-    for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
+    for data, targets, seen_or_unseen in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
+        seen_or_unseen = seen_or_unseen.to(device)
 
         optimizer.zero_grad()
         output = model(data)
         loss = loss_fn(output, targets)
+
+        cal_stacking = seen_or_unseen + 1.0
+        cal_stacking[cal_stacking == 2] = tau
+        loss = (loss * cal_stacking).mean()
+
         loss.backward()
         losses.append(loss.item())
         optimizer.step()
         wandb.log({"loss": loss.item()})
 
-    if epoch % 10 == 0:
+    if True:
         with torch.no_grad():
             correct_seen = 0
             correct_unseen = 0

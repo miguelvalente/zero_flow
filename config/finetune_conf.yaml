@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 200
+  value: 100
 batch_size:
   desc: Size of each batch
   value: 256
@@ -13,6 +13,12 @@ num_classes:
 test:
   desc: Number of classes to use
   value: false  # Number of classes in CUB2011
+tau:
+  desc: Number of classes to uske
+  value: 0.5  # Number of classes in CUB2011
+randomness:
+  desc: The probability of replacing visual by generated
+  value: 3 # Number of classes in CUB2011
    
 
 

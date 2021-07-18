@@ -25,7 +25,7 @@ import torchvision.transforms as transforms
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'online'
+os.environ['WANDB_MODE'] = 'line'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -154,7 +154,7 @@ for epoch in range(1, config['epochs']):
     run.log({"epoch": epoch})
     print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')
 
-    if epoch % 100 == 0:
+    if epoch % 30 == 0:
         state = {'config': config.as_dict(),
                  'split': config['split'],
                  'state_dict': model.state_dict()}

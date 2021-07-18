@@ -17,11 +17,12 @@ class Cub2011(Dataset):
     filename = 'CUB_200_2011.tgz'
     tgz_md5 = '97eceeb196236b17998738112f37df78'
 
-    def __init__(self, root, test=False, split='zsl_split_20.txt', transform=None, loader=default_loader, download=True):
+    def __init__(self, root, test=False, split='zsl_split_20.txt', transform=None, config=None, loader=default_loader, download=True):
         self.root = os.path.expanduser(root)
         self.test = test
         self.split = split
         self.transform = transform
+        self.config = config
         self.loader = default_loader
         self.evaluation = False
         self.features_inserted = False
@@ -58,15 +59,15 @@ class Cub2011(Dataset):
         self.imgs_per_class = Counter(self.targets)
         self.seen_unseen = list(self.data.is_training_img)
 
-        # img_paths = [os.path.join(self.root, self.base_folder, img) for img in list(self.data.filepath)]
-        # self.visual_features = []
-        # for img in tqdm(img_paths, desc="Extracting Visual Features"):
-        #     img = self.loader(img)
-        #     if self.transform is not None:
-        #         img = self.transform(img)
-        #     self.visual_features.append(img)
+        img_paths = [os.path.join(self.root, self.base_folder, img) for img in list(self.data.filepath)]
+        self.visual_features = []
+        for img in tqdm(img_paths, desc="Extracting Visual Features"):
+            img = self.loader(img)
+            if self.transform is not None:
+                img = self.transform(img)
+            self.visual_features.append(img)
 
-        self.visual_features = torch.ones((len(self.data), 2048))
+        # self.visual_features = torch.ones((len(self.data), 2048))
 
         self.test_gen = []
         self.test_real = []
@@ -105,11 +106,11 @@ class Cub2011(Dataset):
             target = self.targets[idx]
             seen_or_unseen = self.seen_unseen[idx]
 
-            return img, target, seen_or_unseen  # unseen = 1 / seen = 0
+            return img, target, seen_or_unseen  # unseen = 0 / seen = 1
         else:
-            if random.choice(3) != 0:
+            if random.choice(self.config['randomness']) == 0:
                 target = self.targets[idx]
-                if self.seen_unseen[idx] == 0:
+                if self.seen_unseen[idx] == 1:
                     self.test_real.append(target)
                     img = self.visual_features[idx]
                 else:
@@ -118,17 +119,18 @@ class Cub2011(Dataset):
             else:
                 img = self.generated_features[idx]
                 target = self.targets[idx]
+                self.test_gen.append(target)
 
-            return img, target
+            seen_or_unseen = self.seen_unseen[idx]
+            return img, target, seen_or_unseen
 
     def insert_generated_features(self, generated_features, labels):
-        """Function used to insert unseen generated features for Generatice Zero Shot Learning
+        """Function used to insert generated features for Generative Zero Shot Learning
            Also serves to set zero_shot_mode to True. This is used to calculate the lenght of the data with new unseeen features
 
         Parameters:
-        generated_unseen_features (tensor array): Features generated for each unseen class
-        number_samples (int): number of generated samples per unseen class
-
+        generated_features (tensor array): Features generated for each class
+        number_samples (int): number of generated samples per class
         """
         self.generated_features = (generated_features).reshape(-1, generated_features.shape[-1])
         self.targets = labels

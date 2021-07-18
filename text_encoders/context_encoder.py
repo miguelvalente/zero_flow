@@ -6,6 +6,7 @@ import pickle
 import torch
 from tqdm import tqdm
 from text_encoders.text_encoder import AlbertEncoder, ProphetNet, BartEncoder
+from text_encoders.word_embeddings import WordEmbeddings
 import yaml
 
 class ContextEncoder():
@@ -23,6 +24,8 @@ class ContextEncoder():
             self.text_encoder = AlbertEncoder(self.config, device=self.device)
         elif self.config['text_encoder'] == 'bart':
             self.text_encoder = BartEncoder(self.config, device=self.device)
+        elif self.config['text_encoder'] == 'glove':
+            self.text_encoder = WordEmbeddings(self.config, device=self.device)
         else:
             print("Model not found")
             raise
@@ -46,14 +49,15 @@ class ContextEncoder():
 
         if self.generation:
             articles = [articles[i] for i in self.generation_ids]
-            semantic = tqdm(articles, desc='Encoding Unseen Classes Semantic Descriptions CUB2011')
+            semantic = tqdm(articles, desc='Generation: Encoding Classes Semantic Descriptions CUB2011')
 
-            self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)) for article in semantic]
+            self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)).type(torch.float32) for article in semantic]
             self.contexts = torch.stack(self.contexts)
+            # self.contexts = torch.ones((200, 1024))
         else:
             semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
 
-            self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)) for article in semantic]
+            self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)).type(torch.float32) for article in semantic]
             # self.contexts = torch.ones((200, 1024))
 
             self.contexts = torch.stack(self.contexts)

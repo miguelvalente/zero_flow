@@ -37,15 +37,12 @@ act_norm:
 dataset:
   desc: which dataset to use
   value: cub2011 #imagenet
-cub2011_dir:
-  desc: directory for cub2011
-  value:
-image_net_dir:
-  desc: directory for Image Net
-  value: /project/data/image_net/train
+glove_dir:
+  desc: directory for glove
+  value: /project/data/glove.840B.300d.txt # /project/data/image_net/train
 text_encoder:
   desc: which text encoder to use
-  value: albert #bart #albert  # prophet_net
+  value: glove #albert #bart #albert  # prophet_net
 model_name:
   desc: model name of text encoder
   value: albert-base-v2 # albert-xxlarge-v2
@@ -63,10 +60,10 @@ aggregate_long_text_splits_method:
   value: mean
 overlap_window:
   desc: how much overlap between articles
-  value: 5
+  value: 3
 max_length:
   desc: max length
-  value: 10
+  value: 20
 split:
   desc: what split is being used
   value: proposed_split1.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011

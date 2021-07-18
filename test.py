@@ -24,7 +24,7 @@ import torchvision.models as models
 import yaml
 from nets import Classifier
 from text_encoders.context_encoder import ContextEncoder
-from dataloaders.cub2011_zero import Cub2011
+from dataloaders.cub2011 import Cub2011
 from convert import VisualExtractor
 
 os.environ['WANDB_MODE'] = 'offline'
@@ -43,29 +43,14 @@ transforms_cub = transforms.Compose([
     VisualExtractor('resnet50d')
 ])
 
-cub = Cub2011(root='/project/data/', transform=transforms_cub, download=False)
-seen_ids = cub.seen_ids
-unseen_ids = cub.unseen_ids
+cub = Cub2011(root='/project/data/', which_split='train', transform=transforms_cub, download=False)
+seen_id = cub.seen_id
+unseen_id = cub.unseen_id
 
-context_encoder = ContextEncoder(config, seen_ids, unseen_ids, device)
+context_encoder = ContextEncoder(config, seen_id, unseen_id, device)
 contexts = context_encoder.contexts.to(device)
 cs = context_encoder.cs.to(device)
 cu = context_encoder.cu.to(device)
-
-
-# model = Classifier(1000, 10)
-
-# model(torch.arange(1000).float())
-
-
-# valdir = '/project/data/val'
-
-# val_dataset = datasets.ImageFolder(
-#     valdir,
-
-#         transforms.RandomHorizontalFlip(), #         transforms.ToTensor(), #         normalize, #     ]))
-
-# print()
 
 
 model = timm.create_model('resnet50d', pretrained=True, num_classes=0)
