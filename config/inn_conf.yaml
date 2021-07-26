@@ -36,13 +36,13 @@ act_norm:
   value: true
 dataset:
   desc: which dataset to use
-  value: cub2011 #imagenet
+  value: manual_cub2011 #imagenet
 glove_dir:
   desc: directory for glove
   value: /project/data/glove.840B.300d.txt # /project/data/image_net/train
 text_encoder:
   desc: which text encoder to use
-  value: glove #albert #bart #albert  # prophet_net
+  value: manual #albert #bart #albert  # prophet_net
 model_name:
   desc: model name of text encoder
   value: albert-base-v2 # albert-xxlarge-v2

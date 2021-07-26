@@ -12,7 +12,7 @@ import torch.distributions as dist
 from act_norm import ActNormBijection
 from text_encoders.text_encoder import ProphetNet, AlbertEncoder
 from text_encoders.context_encoder import ContextEncoder
-from dataloaders.cub2011 import Cub2011
+from dataloaders.cub2011 import Cub2011_Pre
 
 import timm
 from PIL import Image
@@ -25,20 +25,16 @@ import torchvision.transforms as transforms
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'online'
+os.environ['WANDB_MODE'] = 'offline'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-run = wandb.init(project='zero_flow_CUB', entity='mvalente',
-                 config=r'config/flow_conf.yaml')
+run = wandb.init(project='zero_inn_CUB', entity='mvalente',
+                 config=r'config/inn_conf.yaml')
 
 config = wandb.config
 
-transforms_cub = transforms.Compose([
-    VisualExtractor(config['image_encoder'])
-])
-
-cub_train = Cub2011(which_split='train', root='/project/data/', split=config['split'], transform=transforms_cub)
+cub_train = Cub2011_Pre(which_split='train', root='/project/data/', split=config['split'])
 seen_id = cub_train.seen_id
 unseen_id = cub_train.unseen_id
 
@@ -49,7 +45,7 @@ cu = context_encoder.cu.to(device)
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-cub_val = Cub2011(which_split='test', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
+cub_val = Cub2011_Pre(which_split='test', root='/project/data/', split=config['split'], download=False)
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
 test_id = cub_val.test_id
 
@@ -82,17 +78,17 @@ if not config['hidden_dims']:
 else:
     hidden_dims = config['hidden_dims']
 
-transforms = []
+transform = []
 for index in range(config['block_size']):
     if config['act_norm']:
-        transforms.append(ActNormBijection(input_dim, data_dep_init=True))
-    transforms.append(permuter(input_dim))
-    transforms.append(AffineCoupling(
+        transform.append(ActNormBijection(input_dim, data_dep_init=True))
+    transform.append(permuter(input_dim))
+    transform.append(AffineCoupling(
         input_dim,
         split_dim,
         context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=config['net']))
 
-model = Flow(transforms, base_dist)
+model = Flow(transform, base_dist)
 model.train()
 model = model.to(device)
 
@@ -134,7 +130,7 @@ for epoch in range(1, config['epochs']):
                  "ldj": ldj.item(),  # }, step=epoch)
                  "lg": lg.item()})
 
-    if epoch % 5 == 0:
+    if epoch % 2 == 0:
         with torch.no_grad():
             loss_flow_val = 0
             centralizing_loss_val = 0
@@ -156,7 +152,7 @@ for epoch in range(1, config['epochs']):
         run.log({"epoch": epoch})
     print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')
 
-    if epoch % 100 == 0:
+    if epoch % 20 == 0:
         state = {'config': config.as_dict(),
                  'split': config['split'],
                  'state_dict': model.state_dict()}

@@ -95,7 +95,7 @@ class Flow(Transform):
         centralizing_loss = 0.0
         means = torch.stack([data[targets == t].mean(axis=0) for t in targets.unique()])
 
-        idxs = [(seen_id == target).nonzero()[0][0] for target in np.asarray(targets.unique().to("cpu").detach())]
+        idxs = [np.where(seen_id == target)[0][0] for target in np.asarray(targets.unique().to("cpu").detach())]
 
         gens = self.generation(F.pad(cs[idxs], (0, padding)))
 

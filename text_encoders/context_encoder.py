@@ -1,13 +1,16 @@
 import csv
 import os
+import pickle
 
 import numpy as np
-import pickle
+import scipy.io
 import torch
-from tqdm import tqdm
-from text_encoders.text_encoder import AlbertEncoder, ProphetNet, BartEncoder
-from text_encoders.word_embeddings import WordEmbeddings
 import yaml
+from tqdm import tqdm
+
+from text_encoders.text_encoder import AlbertEncoder, BartEncoder, ProphetNet
+from text_encoders.word_embeddings import WordEmbeddings
+
 
 class ContextEncoder():
     def __init__(self, config, generation_ids=None, seen_id=None, unseen_id=None, device='cpu', generation=False):
@@ -26,6 +29,8 @@ class ContextEncoder():
             self.text_encoder = BartEncoder(self.config, device=self.device)
         elif self.config['text_encoder'] == 'glove':
             self.text_encoder = WordEmbeddings(self.config, device=self.device)
+        elif self.config['text_encoder'] == 'manual':
+            print('Using manual attributes')
         else:
             print("Model not found")
             raise
@@ -34,6 +39,8 @@ class ContextEncoder():
             self.encode_contexts_imagenet()
         elif self.config['dataset'] == 'cub2011':
             self.encode_contexts_cub2011()
+        elif self.config['dataset'] == 'manual_cub2011':
+            self.load_contexts_cub2011()
         else:
             print("Dataset not found")
             raise
@@ -96,6 +103,16 @@ class ContextEncoder():
 
         return article_correspondences, articles
 
+    def load_contexts_cub2011(self):
+        raw_att = scipy.io.loadmat('data/xlsa17/data/CUB/att_splits.mat')
+
+        if self.generation:
+            self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
+            self.contexts = self.contexts[self.generation_ids]
+        else:
+            self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
+            self.cs = self.contexts[self.seen_id]
+            self.cu = self.contexts[self.unseen_id]
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
