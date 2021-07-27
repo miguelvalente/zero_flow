@@ -50,8 +50,8 @@ class Cub2011(Dataset):
         self.seen_ids = list(self.data[self.data.is_training_img == 1].target.unique() - 1)
         self.test_ids = list(self.data[self.data.is_training_img == 2].target.unique() - 1)
 
-        # self.data = self.data[self.data.is_training_img == 0]
-        self.data = self.data[self.data.is_training_img == 1]
+        self.data = self.data[self.data.is_training_img == 0]
+        # self.data = self.data[self.data.is_training_img == 1]
 
         # Contexts to generate
         self.generation_ids = self.data.target.unique() - 1
@@ -64,17 +64,15 @@ class Cub2011(Dataset):
 
         ids = self.data['img_id'].to_numpy() - 1
 
-        self.visual_features = torch.from_numpy(raw_res['features'].transpose()[ids]).type(torch.float32)
-        self.targets = self.data['target'].to_list()
-        # img_paths = [os.path.join(self.root, self.base_folder, img) for img in list(self.data.filepath)]
-        # self.visual_features = []
-        # for img in tqdm(img_paths, desc="Extracting Visual Features"):
-        #     img = self.loader(img)
-        #     if self.transform is not None:
-        #         img = self.transform(img)
-        #     self.visual_features.append(img)
+        raw_visual = raw_res['features'].transpose().tolist()
+        raw_labels = raw_res['labels'].transpose()[-1].tolist()
 
-        # self.visual_features = torch.ones((len(self.data), 2048))
+        visuals = [v for _, v in sorted(zip(raw_labels, raw_visual), key=lambda pair: pair[0])]
+        visuals = torch.stack([torch.tensor(v).type(torch.float32) for v in visuals])
+
+        self.visual_features = visuals[ids]  
+        self.targets = self.data['target'].to_list()
+
 
         self.test_gen = []
         self.test_real = []

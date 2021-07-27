@@ -1,36 +1,39 @@
 import os
-import torch
-import wandb
-from transform import Flow
-import tqdm
-from distributions import DoubleDistribution, SemanticDistribution
-from permuters import LinearLU, Permuter, Reverse
-import torch.nn as nn
-from affine_coupling import AffineCoupling
-import torch.optim as optim
-import torch.distributions as dist
-from act_norm import ActNormBijection
-from text_encoders.text_encoder import ProphetNet, AlbertEncoder
-from text_encoders.context_encoder import ContextEncoder
-from dataloaders.cub2011 import Cub2011
 
 import timm
+import torch
+import torch.distributions as dist
+import torch.nn as nn
+import torch.optim as optim
+import torchvision.datasets as datasets
+import torchvision.transforms as transforms
+import tqdm
+import yaml
 from PIL import Image
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
-from convert import VisualExtractor
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
 
+import wandb
+from act_norm import ActNormBijection
+from affine_coupling import AffineCoupling
+from convert import VisualExtractor
+from dataloaders.cub2011 import Cub2011
+from distributions import DoubleDistribution, SemanticDistribution
+from permuters import LinearLU, Permuter, Reverse
+from text_encoders.context_encoder import ContextEncoder
+from text_encoders.text_encoder import AlbertEncoder, ProphetNet
+from transform import Flow
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'online'
-save = True
+os.environ['WANDB_MODE'] = 'offline'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
                  config=r'config/flow_conf.yaml')
+
+with open('config/dataloader_conf.yaml', 'r') as stream:
+    wandb.config.update(yaml.safe_load(stream))
 
 config = wandb.config
 
@@ -38,14 +41,14 @@ transforms_cub = transforms.Compose([
     VisualExtractor(config['image_encoder'])
 ])
 
-cub_train = Cub2011(which_split='train', root='/project/data/', split=config['split'], transform=transforms_cub)
+cub_train = Cub2011(which_split='train', root='/project/data/', config=config, transform=transforms_cub)
 seen_id = cub_train.seen_id
 unseen_id = cub_train.unseen_id
 
-context_encoder = ContextEncoder(config, seen_id=seen_id, unseen_id=unseen_id, device=device)
+context_encoder = ContextEncoder(config, device=device)
 contexts = context_encoder.contexts.to(device)
-cs = context_encoder.cs.to(device)
-cu = context_encoder.cu.to(device)
+cs = contexts[seen_id].to(device)
+cu = contexts[unseen_id].to(device)
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
@@ -134,7 +137,7 @@ for epoch in range(1, config['epochs']):
                  "ldj": ldj.item(),  # }, step=epoch)
                  "lg": lg.item()})
 
-    if epoch % 5 == 0:
+    if epoch % 2 == 0:
         with torch.no_grad():
             loss_flow_val = 0
             centralizing_loss_val = 0

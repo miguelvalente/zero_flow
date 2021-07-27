@@ -27,14 +27,14 @@ from transform import Flow
 CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
 os.environ['WANDB_MODE'] = 'online'
-os.environ['WANDB_NAME'] = 'generated_seen_INN'
+os.environ['WANDB_NAME'] = 'generated_unseen_INN'
 save = False
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf_test.yaml')
 
-wandb.config['checkpoint'] = 'dazzling-sound-1-20.pth'
+wandb.config['checkpoint'] = 'vibrant-bee-10-20.pth'
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
@@ -168,20 +168,20 @@ for epoch in range(config['epochs']):
                 outputs = model(images)
                 _, predicted = torch.max(outputs, 1)
 
-                total_seen += seen_or_unseen[seen_or_unseen == 1].numel()
-                # total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
+                # total_seen += seen_or_unseen[seen_or_unseen == 1].numel()
+                total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
 
-                # correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
-                correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
+                correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
+                # correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
 
             # print(f'correct unseen:{correct_unseen} | total u:{total_unseen}')
 
-            accuracy_seen = correct_seen / total_seen
-            # if correct_unseen != 0:
-                # accuracy_unseen = correct_unseen / total_unseen
+            # accuracy_seen = correct_seen / total_seen
+            if correct_unseen != 0:
+                accuracy_unseen = correct_unseen / total_unseen
 
-            wandb.log({"Acc_seen": accuracy_seen})
-            # wandb.log({"Acc_unseen": accuracy_unseen})
+            # wandb.log({"Acc_seen": accuracy_seen})
+            wandb.log({"Acc_unseen": accuracy_unseen})
 
             cub.eval()  # Switch dataset return to img, target
     # print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')

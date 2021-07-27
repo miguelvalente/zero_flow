@@ -68,8 +68,6 @@ class ContextEncoder():
             # self.contexts = torch.ones((200, 1024))
 
             self.contexts = torch.stack(self.contexts)
-            self.cs = self.contexts[self.seen_id]
-            self.cu = self.contexts[self.unseen_id]
 
     def encode_contexts_imagenet(self):
         class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
@@ -106,13 +104,10 @@ class ContextEncoder():
     def load_contexts_cub2011(self):
         raw_att = scipy.io.loadmat('data/xlsa17/data/CUB/att_splits.mat')
 
+        self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
+
         if self.generation:
-            self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
             self.contexts = self.contexts[self.generation_ids]
-        else:
-            self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
-            self.cs = self.contexts[self.seen_id]
-            self.cu = self.contexts[self.unseen_id]
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -9,6 +9,7 @@ import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 import tqdm
+import yaml
 from PIL import Image
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
@@ -24,13 +25,14 @@ from permuters import LinearLU, Permuter, Reverse
 from text_encoders.context_encoder import ContextEncoder
 from transform import Flow
 
-CUDA_LAUNCH_BLOCKING = 1
+# CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'online'
-os.environ['WANDB_NAME'] = 'INN'
+os.environ['WANDB_MODE'] = 'offline'
+# os.environ['WANDB_NAME'] = 'INN'
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 save = False
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf.yaml')
 
@@ -105,6 +107,7 @@ labels = []
 with torch.no_grad():
     for idx, class_id in enumerate(tqdm.tqdm(generation_ids, desc='Generating Features')):
         number_samples = imgs_per_class[class_id]
+
         generated_features.append(generator.generation(
             torch.hstack((contexts[idx].repeat(number_samples).reshape(-1, context_dim),
                           visual_distribution.sample([number_samples])))))

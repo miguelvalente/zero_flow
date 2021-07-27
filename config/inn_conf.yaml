@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 2000
+  value: 21
 batch_size:
   desc: Size of each batch
   value: 256
@@ -30,10 +30,10 @@ net:
   value: MLP #MLPR # MLP
 non_linearity:
   desc: non linear function for Affine Coupling
-  value: prelu # relu leakyrelu
+  value: leakyrelu #prelu # relu leakyrelu
 act_norm:
   desc: presence of actnorm
-  value: true
+  value: false
 dataset:
   desc: which dataset to use
   value: manual_cub2011 #imagenet

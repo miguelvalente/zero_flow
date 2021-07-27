@@ -1,0 +1,4 @@
+save_visual_features: 'data/CUB_200_2011/mat/'
+load_precomputed_visual: False
+#mat_file: 'data/xlsa17/data/CUB/resnet101.mat'
+mat_file: 'data/CUB_200_2011/mat/resnet50d.mat'
