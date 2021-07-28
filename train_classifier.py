@@ -38,7 +38,7 @@ with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml
     wandb.config.update(yaml.safe_load(d))
     wandb.config.update(yaml.safe_load(c))
 
-wandb.config['checkpoint'] = 'dazzling-sound-1-340.pth'
+wandb.config['checkpoint'] = 'fresh-paper-140-20.pth'
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
@@ -124,20 +124,23 @@ except Exception:
 train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size_c'], shuffle=True, pin_memory=True)
 val_loader = torch.utils.data.DataLoader(cub, batch_size=1000, shuffle=True, pin_memory=True)
 
-model = Classifier(input_dim, config['num_classes'])
+model = Classifier(input_dim, len(generation_ids))
 model.train()
 model = model.to(device)
 
 print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameters()])}')
 run.watch(model)
 
-loss_fn = nn.CrossEntropyLoss().to(device)
+if config['tau']:
+    loss_fn = nn.CrossEntropyLoss(reduction='none').to(device)
+else:
+    loss_fn = nn.CrossEntropyLoss().to(device)
+
 optimizer = optim.Adam(model.parameters(), lr=config['lr_c'])
 tau = config['tau']
 tau = torch.tensor(tau).to(device)
 for epoch in range(config['epochs_c']):
     losses = []
-    #  for batch_idx, (input, target) in enumerate(loader):
     for data, targets, seen_or_unseen in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
@@ -147,9 +150,10 @@ for epoch in range(config['epochs_c']):
         output = model(data)
         loss = loss_fn(output, targets)
 
-        # cal_stacking = seen_or_unseen + 1.0
-        # cal_stacking[cal_stacking == 2] = tau
-        # loss = (loss * cal_stacking).mean()
+        if config['tau']:
+            cal_stacking = seen_or_unseen + 1.0
+            cal_stacking[cal_stacking == 2] = tau
+            loss = (loss * cal_stacking).mean()
 
         loss.backward()
         losses.append(loss.item())
@@ -159,13 +163,13 @@ for epoch in range(config['epochs_c']):
     if True:
         with torch.no_grad():
             correct_seen = 0
-            correct_unseen = 0
-            correct_test = 0
-            total_seen = 0
             total_unseen = 0
-            total_test = 0
-            accuracy_seen = 0
             accuracy_unseen = 0
+            correct_unseen = 0
+            total_seen = 0
+            accuracy_seen = 0
+            correct_test = 0
+            total_test = 0
             accuracy_test = 0
             harmonic_mean = 0
 
@@ -177,35 +181,41 @@ for epoch in range(config['epochs_c']):
                 outputs = model(images)
                 _, predicted = torch.max(outputs, 1)
 
-                total_seen += seen_or_unseen[seen_or_unseen == 1].numel()
-                total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
-                total_test += seen_or_unseen[seen_or_unseen == 2].numel()
+                if 'seen' in config['zero_test'] or 'all' in config['zero_test']:
+                    total_seen += seen_or_unseen[seen_or_unseen == 1].numel()
+                    correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
+                if 'zero' in config['zero_test'] or 'all' in config['zero_test']:
+                    total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
+                    correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
+                if 'all' in config['zero_test']:
+                    total_test += seen_or_unseen[seen_or_unseen == 2].numel()
+                    correct_test += (predicted[seen_or_unseen == 2] == labels[seen_or_unseen == 2]).sum().item()
 
-                correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
-                correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
-                correct_test += (predicted[seen_or_unseen == 2] == labels[seen_or_unseen == 2]).sum().item()
+            # print(f'correct seen:{correct_seen}  correct unseen:{correct_unseen} | total s:{total_seen}  total u:{total_unseen}')
 
-            print(f'correct seen:{correct_seen}  correct unseen:{correct_unseen} | total s:{total_seen}  total u:{total_unseen}')
+            if 'seen' in config['zero_test'] or 'all' in config['zero_test']:
+                if correct_seen != 0:
+                    accuracy_seen = correct_seen / total_seen
+                wandb.log({"Acc_seen": accuracy_seen})
 
-            accuracy_seen = correct_seen / total_seen
-            accuracy_unseen = correct_unseen / total_unseen
-            if accuracy_seen != 0 and accuracy_unseen != 0:
-                harmonic_mean = 2 / (1 / accuracy_seen +
-                                     1 / accuracy_unseen)
+            if 'zero' in config['zero_test'] or 'all' in config['zero_test']:
+                if correct_unseen != 0:
+                    accuracy_unseen = correct_unseen / total_unseen
+                wandb.log({"Acc_unseen": accuracy_unseen})
 
-            if correct_test != 0:
-                accuracy_test = correct_test / total_test
+            if 'seen' in config['zero_test'] and 'zero' in config['zero_test']:
+                if accuracy_seen != 0 and accuracy_unseen != 0:
+                    harmonic_mean = 2 / (1 / accuracy_seen +
+                                         1 / accuracy_unseen)
+                wandb.log({"Harmonic Mean": harmonic_mean})
 
-            wandb.log({"Acc_seen": accuracy_seen,
-                       "Acc_unseen": accuracy_unseen,
-                       "Harmonic Mean": harmonic_mean,
-                       "Epoch": epoch})
-
-            if config['test']:
-                wandb.log({"Acc_test": accuracy_test})
-
+            if 'all' in config['zero_test']:
+                if correct_test != 0:
+                    accuracy_test = correct_test / total_test
+                    wandb.log({"Acc_test": accuracy_test})
             cub.eval()  # Switch dataset return to img, target
+
     print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')
+
     if loss.isnan():
-        print('Nan in loss!')
         raise Exception('Nan in loss!')

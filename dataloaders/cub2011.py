@@ -113,18 +113,17 @@ class Cub2011(Dataset):
         self.test_id = self.data[self.data['is_training_img'] == 2].target.unique() - 1
 
         if self.zero_shot:
-            if self.config['zero_test']:
-                if self.config['zero_test'] == 'seen':
-                    self.data = self.data[self.data['is_training_img'] == 1]
-                elif self.config['zero_test'] == 'unseen':
-                    self.data = self.data[self.data['is_training_img'] == 0]
-                elif self.config['zero_test'] == 'seen_unseen':
-                    self.data = self.data[(self.data.is_training_img == 0) | (self.data.is_training_img == 1)]
-                elif self.config['zero_test'] == 'all_with_test':
-                    print(f'{IDENTITY} Using all data plus test')
-                else:
-                    print(f'{IDENTITY}Cannot perform zero_shot test without specifying the set of data')
-                    raise Exception
+            if self.config['zero_test'] == 'seen':
+                self.data = self.data[self.data['is_training_img'] == 1]
+            elif self.config['zero_test'] == 'zero':
+                self.data = self.data[self.data['is_training_img'] == 0]
+            elif self.config['zero_test'] == 'seen_zero':
+                self.data = self.data[(self.data.is_training_img == 0) | (self.data.is_training_img == 1)]
+            elif self.config['zero_test'] == 'all':
+                print(f'{IDENTITY} Using all data plus test')
+            else:
+                print(f'{IDENTITY}Cannot perform zero_shot test without specifying the set of data')
+                raise Exception
 
             self.generation_ids = self.data['target'].unique() - 1
 
@@ -132,8 +131,8 @@ class Cub2011(Dataset):
             self.imgs_per_class = Counter(self.targets)
             self.seen_unseen = self.data['is_training_img'].to_list()
 
-            # self.test_gen = []
-            # self.test_real = []
+            self.test_gen = []
+            self.test_real = []
         else:
             if self.which_split == 'train':
                 self.data = self.data[self.data['is_training_img'] == 1]
@@ -142,7 +141,7 @@ class Cub2011(Dataset):
             elif self.which_split == 'test':
                 self.data = self.data[self.data['is_training_img'] == 2]
             elif self.which_split == 'full':
-                print(f"{IDENTITY}Using entire dataset, CONFIG[save_features] = {self.config['save_visual_features']}")
+                print(f"{IDENTITY} ({self.which_split}) Using entire dataset, CONFIG[save_features] = {self.config['save_visual_features']}")
             else:
                 print('Split role not defined')
 

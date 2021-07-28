@@ -26,7 +26,7 @@ from transform import Flow
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
@@ -53,7 +53,7 @@ cu = contexts[unseen_id].to(device)
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size_f'], shuffle=True, pin_memory=True)
 
-cub_val = Cub2011(which_split='test', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
+cub_val = Cub2011(which_split='test', root='/project/data/', config=config, transform=transforms_cub)
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
 test_id = cub_val.test_id
 
@@ -104,7 +104,7 @@ print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameter
 run.watch(model)
 optimizer = optim.Adam(model.parameters(), lr=config['lr_f'])
 
-for epoch in range(1, config['epochs?f']):
+for epoch in range(1, config['epochs_f']):
     losses = []
     for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
@@ -160,7 +160,7 @@ for epoch in range(1, config['epochs?f']):
         run.log({"epoch": epoch})
     print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')
 
-    if epoch % 100 == 0:
+    if epoch % 2 == 0:
         state = {'config': config.as_dict(),
                  'split': config['split'],
                  'state_dict': model.state_dict()}
