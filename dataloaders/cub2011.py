@@ -22,13 +22,14 @@ class Cub2011(Dataset):
     filename = 'CUB_200_2011.tgz'
     tgz_md5 = '97eceeb196236b17998738112f37df78'
 
-    def __init__(self, root, zero_shot_use=False, which_split=None, 
+    def __init__(self, root, zero_shot=False, zero_test=None, which_split=None, 
                  transform=None, config=None, loader=default_loader, download=False):
         self.root = os.path.expanduser(root)
         self.which_split = which_split
         self.transform = transform
         self.config = config
-        self.zero_shot_use = zero_shot_use
+        self.zero_shot = zero_shot
+        self.zero_test = zero_test
         self.loader = default_loader
         self.evaluation = False
 
@@ -39,6 +40,38 @@ class Cub2011(Dataset):
             raise RuntimeError('Dataset not found or corrupted.' +
                                ' You can use download=True to download it')
 
+    def __getitem__(self, idx):
+        if self.zero_shot:
+            if self.evaluation:
+                img = self.visual_features[idx]
+                target = self.targets[idx]
+                seen_or_unseen = self.seen_unseen[idx]
+
+                return img, target, seen_or_unseen  # unseen = 0 / seen = 1
+            else:
+                if random.choice(self.config['randomness']) == 0:
+                    target = self.targets[idx]
+                    if self.seen_unseen[idx] == 1:
+                        self.test_real.append(target)
+                        img = self.visual_features[idx]
+                    else:
+                        self.test_gen.append(target)
+                        img = self.generated_features[idx]
+                else:
+                    img = self.generated_features[idx]
+                    target = self.targets[idx]
+                    self.test_gen.append(target)
+
+                seen_or_unseen = self.seen_unseen[idx]
+                return img, target, seen_or_unseen
+        else:
+            img = self.visual_features[idx]
+            target = self.targets[idx]
+
+            return img, target
+
+    def __len__(self):
+        return len(self.data)
     def _check_integrity(self):
         try:
             self._load_metadata()
@@ -57,7 +90,7 @@ class Cub2011(Dataset):
             if self.config['load_precomputed_visual']:
                 self._load_precomputed(self.config['mat_file'])
             else:
-                self._load_images()
+                self._encode_images()
         except Exception:
             print('Error loading visual features')
             return False
@@ -79,15 +112,24 @@ class Cub2011(Dataset):
         self.unseen_id = self.data[self.data['is_training_img'] == 0].target.unique() - 1
         self.test_id = self.data[self.data['is_training_img'] == 2].target.unique() - 1
 
-        if self.zero_shot_use:
-            self.generation_ids = self.data['target'].unique() - 1
+        if self.zero_shot:
+            if self.zero_test:
+                if self.zero_test == 'seen_only':
+                    self.data = self.data[self.data['is_training_img'] == 1]
+                elif self.zero_test == 'unseen_only':
+                    self.data = self.data[self.data['is_training_img'] == 0]
+                else:
+                    raise Exception:
+                        print('Cannot perform zero_shot test without specifying the set of data')
+            else:
+                self.generation_ids = self.data['target'].unique() - 1
 
-            self.targets = list(self.data['target'] - 1)
-            self.imgs_per_class = Counter(self.targets)
-            self.seen_unseen = self.data['is_training_img'].to_list()
+                self.targets = list(self.data['target'] - 1)
+                self.imgs_per_class = Counter(self.targets)
+                self.seen_unseen = self.data['is_training_img'].to_list()
 
-            self.test_gen = []
-            self.test_real = []
+            # self.test_gen = []
+            # self.test_real = []
         else:
             if self.which_split == 'train':
                 self.data = self.data[self.data['is_training_img'] == 1]
@@ -123,7 +165,7 @@ class Cub2011(Dataset):
         self.visual_features = features[img_ids]
         self.targets = list(self.data['target'] - 1)
 
-    def _load_images(self):
+    def _encode_images(self):
         save_path = f"{self.config['save_visual_features']}{self.config['image_encoder']}.mat"
 
         if os.path.exists(save_path):
@@ -159,8 +201,6 @@ class Cub2011(Dataset):
         with tarfile.open(os.path.join(self.root, self.filename), "r:gz") as tar:
             tar.extractall(path=self.root)
 
-    def __len__(self):
-        return len(self.data)
 
     def insert_generated_features(self, generated_features, labels):
         """Function used to insert generated features for Generative Zero Shot Learning
@@ -176,32 +216,3 @@ class Cub2011(Dataset):
         '''Function to set self.evaluation True and False to change __getitem__() return'''
         self.evaluation = False if self.evaluation else True
 
-    def __getitem__(self, idx):
-        if self.zero_shot_use:
-            if self.evaluation:
-                img = self.visual_features[idx]
-                target = self.targets[idx]
-                seen_or_unseen = self.seen_unseen[idx]
-
-                return img, target, seen_or_unseen  # unseen = 0 / seen = 1
-            else:
-                if random.choice(self.config['randomness']) == 0:
-                    target = self.targets[idx]
-                    if self.seen_unseen[idx] == 1:
-                        self.test_real.append(target)
-                        img = self.visual_features[idx]
-                    else:
-                        self.test_gen.append(target)
-                        img = self.generated_features[idx]
-                else:
-                    img = self.generated_features[idx]
-                    target = self.targets[idx]
-                    self.test_gen.append(target)
-
-                seen_or_unseen = self.seen_unseen[idx]
-                return img, target, seen_or_unseen
-        else:
-            img = self.visual_features[idx]
-            target = self.targets[idx]
-
-            return img, target

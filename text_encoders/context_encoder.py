@@ -21,52 +21,66 @@ class ContextEncoder():
         self.generation_ids = np.array(generation_ids)
         self.generation = generation
 
-        if self.config['text_encoder'] == 'prophet_net':
-            self.text_encoder = ProphetNet(self.config, device=self.device)
-        elif self.config['text_encoder'] == 'albert':
-            self.text_encoder = AlbertEncoder(self.config, device=self.device)
-        elif self.config['text_encoder'] == 'bart':
-            self.text_encoder = BartEncoder(self.config, device=self.device)
-        elif self.config['text_encoder'] == 'glove':
-            self.text_encoder = WordEmbeddings(self.config, device=self.device)
-        elif self.config['text_encoder'] == 'manual':
-            print('Using manual attributes')
+        if self.config['load_precomputed_text']:
+            self._load_features()
         else:
-            print("Model not found")
-            raise
+            if self.config['text_encoder'] == 'prophet_net':
+                self.text_encoder = ProphetNet(self.config, device=self.device)
+            elif self.config['text_encoder'] == 'albert':
+                self.text_encoder = AlbertEncoder(self.config, device=self.device)
+            elif self.config['text_encoder'] == 'bart':
+                self.text_encoder = BartEncoder(self.config, device=self.device)
+            elif self.config['text_encoder'] == 'glove':
+                self.text_encoder = WordEmbeddings(self.config, device=self.device)
+            else:
+                print("Model not found")
+                raise
 
-        if self.config['dataset'] == 'imagenet':
+            if self.config['dataset'] == 'imagenet':
             self.encode_contexts_imagenet()
-        elif self.config['dataset'] == 'cub2011':
-            self.encode_contexts_cub2011()
-        elif self.config['dataset'] == 'manual_cub2011':
-            self.load_contexts_cub2011()
+            elif self.config['dataset'] == 'cub2011':
+                self.encode_contexts_cub2011()
+            else:
+                raise Exception:
+                    print("Dataset not found")
+
+    def _load_precomputed(self, mat_file):
+        print(f'##### Loading .mat file: {mat_file}')
+        if not os.path.exists(mat_file):
+            print('##### .mat does not exist. Change config[load_precomputed_text] to False')
+
+        # raw_att = scipy.io.loadmat('data/xlsa17/data/CUB/att_splits.mat')
+        raw_features = scipy.io.loadmat('data/xlsa17/data/CUB/att_splits.mat')
+
+        if mat_file.split('/')[-1] == 'att_splits.mat':  # Special case
+            self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
         else:
-            print("Dataset not found")
-            raise
+            self.contexts = torch.from_numpy(raw_att['features']).type(torch.float32)
+
+        if self.generation:
+            self.contexts = self.contexts[self.generation_ids]
 
     def encode_contexts_cub2011(self):
-        dira = '/project/data/Raw_Wiki_Articles/CUBird_WikiArticles'
+        wiki_dir = '/project/data/Raw_Wiki_Articles/CUBird_WikiArticles'
 
-        file_list = next(os.walk(dira), (None, None, []))[2]
+        file_list = next(os.walk(wiki_dir), (None, None, []))[2]
         file_list_id = [int(file.split('.')[0]) for file in file_list]
         file_list_ordered = [x for _, x in sorted(zip(file_list_id, file_list))]
 
-        articles = [open(f'{dira}/{file}').read() for file in file_list_ordered]
+        articles = [open(f'{wiki_dir}/{file}').read() for file in file_list_ordered]
 
-        if self.generation:
-            articles = [articles[i] for i in self.generation_ids]
-            semantic = tqdm(articles, desc='Generation: Encoding Classes Semantic Descriptions CUB2011')
-
-            self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)).type(torch.float32) for article in semantic]
-            self.contexts = torch.stack(self.contexts)
-            # self.contexts = torch.ones((200, 1024))
-        else:
+        if config['save_visual_features']
             semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
 
             self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)).type(torch.float32) for article in semantic]
             # self.contexts = torch.ones((200, 1024))
 
+            self.contexts = torch.stack(self.contexts)
+        if self.generation:
+            articles = [articles[i] for i in self.generation_ids]
+            semantic = tqdm(articles, desc='Generation: Encoding Classes Semantic Descriptions CUB2011')
+
+            self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)).type(torch.float32) for article in semantic]
             self.contexts = torch.stack(self.contexts)
 
     def encode_contexts_imagenet(self):
@@ -100,16 +114,3 @@ class ContextEncoder():
             article_correspondences = {item[0]: item[1:] for item in reader}  # Make a dictionary out of the csv {wnid: classes}
 
         return article_correspondences, articles
-
-    def load_contexts_cub2011(self):
-        raw_att = scipy.io.loadmat('data/xlsa17/data/CUB/att_splits.mat')
-
-        self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
-
-        if self.generation:
-            self.contexts = self.contexts[self.generation_ids]
-
-if __name__ == '__main__':
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    with open("/project/config/base_conf.yaml", "r") as ymlfile:
-        config = yaml.load(ymlfile)

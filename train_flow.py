@@ -32,8 +32,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
                  config=r'config/flow_conf.yaml')
 
-with open('config/dataloader_conf.yaml', 'r') as stream:
-    wandb.config.update(yaml.safe_load(stream))
+with open('config/dataloader.yaml', 'r') as d, open('config/dataloader.yaml', 'r') as c:
+    wandb.config.update(yaml.safe_load(d))
+    wandb.config.update(yaml.safe_load(c))
 
 config = wandb.config
 

@@ -3,13 +3,16 @@
         "dists",
         "dtype",
         "has",
+        "imgs",
         "numpy",
         "optim",
         "pyplot",
         "pyro",
         "rsample",
+        "scipy",
         "sklearn",
         "xlabel",
+        "xlsa",
         "ylabel"
     ],
     "launch": {
