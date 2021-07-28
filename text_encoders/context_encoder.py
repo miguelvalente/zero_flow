@@ -35,9 +35,9 @@ class ContextEncoder():
                 raise
 
             if self.config['dataset'] == 'imagenet':
-                self.encode_contexts_imagenet()
+                self._encode_contexts_imagenet()
             elif self.config['dataset'] == 'cub2011':
-                self.encode_contexts_cub2011()
+                self._encode_contexts_cub2011()
             else:
                 print(f"{IDENTITY} Dataset not found")
                 raise Exception
@@ -55,7 +55,7 @@ class ContextEncoder():
         else:
             self.contexts = torch.from_numpy(raw_features['features']).type(torch.float32)
 
-    def encode_contexts_cub2011(self):
+    def _encode_contexts_cub2011(self):
         wiki_dir = '/project/data/Raw_Wiki_Articles/CUBird_WikiArticles'
 
         file_list = next(os.walk(wiki_dir), (None, None, []))[2]
@@ -82,11 +82,11 @@ class ContextEncoder():
                 mdic = {'features': features}
                 savemat(save_path, mdic)
 
-    def encode_contexts_imagenet(self):
+    def _encode_contexts_imagenet(self):
         class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
         articles_dir = "data/ImageNet-Wiki_dataset/class_article_text_descriptions/class_article_text_descriptions_trainval.pkl"
 
-        a, articles = self.article_correspondences(class_ids_dir, articles_dir)
+        a, articles = self._article_correspondences(class_ids_dir, articles_dir)
 
         image_net_dir = self.config['image_net_dir']
 
@@ -100,7 +100,7 @@ class ContextEncoder():
         contexts = [torch.from_numpy(self.text_encoder.encode_multiple_descriptions(article)) for article in semantic]
         self.contexts = torch.stack(contexts).to(self.device)
 
-    def article_correspondences(self, class_article_correspondences_path, class_article_text_descriptions_path):
+    def _article_correspondences(self, class_article_correspondences_path, class_article_text_descriptions_path):
         articles = pickle.load(
             open(class_article_text_descriptions_path, 'rb')
         )

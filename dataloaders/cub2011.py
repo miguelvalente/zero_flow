@@ -36,8 +36,7 @@ class Cub2011(Dataset):
         if download:
             self._download()
 
-        if not self._check_integrity():
-            raise RuntimeError('Dataset not found or corrupted. You can use download=True to download it')
+        self._check_integrity():
 
     def __getitem__(self, idx):
         if self.zero_shot:
@@ -76,15 +75,16 @@ class Cub2011(Dataset):
         try:
             self._load_metadata()
         except Exception:
-            print('Error loading metadata')
-            return False
+            print(f'{IDENTITY} Error loading metadata')
 
         # loop checks if files and dirs exist
-        for index, row in self.data.iterrows():
-            filepath = os.path.join(self.root, self.base_folder, row.filepath)
-            if not os.path.isfile(filepath):
-                print(filepath)
-                return False
+        try:
+            for index, row in self.data.iterrows():
+                filepath = os.path.join(self.root, self.base_folder, row.filepath)
+                if not os.path.isfile(filepath):
+                    print(f'{IDENTITY} Filepath not found: {filepath}')
+        except Exception
+            return False
 
         try:
             if self.config['load_precomputed_visual']:
@@ -92,10 +92,9 @@ class Cub2011(Dataset):
             else:
                 self._encode_images()
         except Exception:
-            print('Error loading visual features')
+            print(f'{IDENTITY} Error loading visual features')
             return False
 
-        return True
 
     def _load_metadata(self):
         images = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'images.txt'), sep=' ',
@@ -120,9 +119,9 @@ class Cub2011(Dataset):
             elif self.config['zero_test'] == 'seen_zero':
                 self.data = self.data[(self.data.is_training_img == 0) | (self.data.is_training_img == 1)]
             elif self.config['zero_test'] == 'all':
-                print(f'{IDENTITY} Using all data plus test')
+                print(f'{IDENTITY} Using all data  points')
             else:
-                print(f'{IDENTITY}Cannot perform zero_shot test without specifying the set of data')
+                print(f'{IDENTITY} Cannot perform zero_shot test without specifying the set of data')
                 raise Exception
 
             self.generation_ids = self.data['target'].unique() - 1
