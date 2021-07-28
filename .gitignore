@@ -2,7 +2,7 @@ data
 #docker/
 wandb/
 checkpoints/
-test.py
+project/test.py
 .vscode/
 __pycache__/
 __pycache__
@@ -13,6 +13,7 @@ __pycache__
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # User-specific files
+*.pyc
 *.rsuser
 *.suo
 *.user
