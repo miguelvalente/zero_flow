@@ -12,6 +12,7 @@ from torchvision.datasets.folder import default_loader
 from torchvision.datasets.utils import download_url
 from tqdm import tqdm
 
+IDENTITY = 'CUB Dataloader| '
 
 class Cub2011(Dataset):
     '''
@@ -22,14 +23,13 @@ class Cub2011(Dataset):
     filename = 'CUB_200_2011.tgz'
     tgz_md5 = '97eceeb196236b17998738112f37df78'
 
-    def __init__(self, root, zero_shot=False, zero_test=None, which_split=None, 
+    def __init__(self, root, zero_shot=False, which_split=None,
                  transform=None, config=None, loader=default_loader, download=False):
         self.root = os.path.expanduser(root)
         self.which_split = which_split
         self.transform = transform
         self.config = config
         self.zero_shot = zero_shot
-        self.zero_test = zero_test
         self.loader = default_loader
         self.evaluation = False
 
@@ -37,8 +37,7 @@ class Cub2011(Dataset):
             self._download()
 
         if not self._check_integrity():
-            raise RuntimeError('Dataset not found or corrupted.' +
-                               ' You can use download=True to download it')
+            raise RuntimeError('Dataset not found or corrupted. You can use download=True to download it')
 
     def __getitem__(self, idx):
         if self.zero_shot:
@@ -72,6 +71,7 @@ class Cub2011(Dataset):
 
     def __len__(self):
         return len(self.data)
+
     def _check_integrity(self):
         try:
             self._load_metadata()
@@ -88,7 +88,7 @@ class Cub2011(Dataset):
 
         try:
             if self.config['load_precomputed_visual']:
-                self._load_precomputed(self.config['mat_file'])
+                self._load_features(self.config['mat_file_visual'])
             else:
                 self._encode_images()
         except Exception:
@@ -113,20 +113,24 @@ class Cub2011(Dataset):
         self.test_id = self.data[self.data['is_training_img'] == 2].target.unique() - 1
 
         if self.zero_shot:
-            if self.zero_test:
-                if self.zero_test == 'seen_only':
+            if self.config['zero_test']:
+                if self.config['zero_test'] == 'seen':
                     self.data = self.data[self.data['is_training_img'] == 1]
-                elif self.zero_test == 'unseen_only':
+                elif self.config['zero_test'] == 'unseen':
                     self.data = self.data[self.data['is_training_img'] == 0]
+                elif self.config['zero_test'] == 'seen_unseen':
+                    self.data = self.data[(self.data.is_training_img == 0) | (self.data.is_training_img == 1)]
+                elif self.config['zero_test'] == 'all_with_test':
+                    print(f'{IDENTITY} Using all data plus test')
                 else:
-                    raise Exception:
-                        print('Cannot perform zero_shot test without specifying the set of data')
-            else:
-                self.generation_ids = self.data['target'].unique() - 1
+                    print(f'{IDENTITY}Cannot perform zero_shot test without specifying the set of data')
+                    raise Exception
 
-                self.targets = list(self.data['target'] - 1)
-                self.imgs_per_class = Counter(self.targets)
-                self.seen_unseen = self.data['is_training_img'].to_list()
+            self.generation_ids = self.data['target'].unique() - 1
+
+            self.targets = list(self.data['target'] - 1)
+            self.imgs_per_class = Counter(self.targets)
+            self.seen_unseen = self.data['is_training_img'].to_list()
 
             # self.test_gen = []
             # self.test_real = []
@@ -138,19 +142,19 @@ class Cub2011(Dataset):
             elif self.which_split == 'test':
                 self.data = self.data[self.data['is_training_img'] == 2]
             elif self.which_split == 'full':
-                print(f"Using entire dataset, CONFIG[save_features] = {self.config['save_visual_features']}")
+                print(f"{IDENTITY}Using entire dataset, CONFIG[save_features] = {self.config['save_visual_features']}")
             else:
                 print('Split role not defined')
 
-    def _load_precomputed(self, mat_file):
-        print(f'##### Loading .mat file: {mat_file}')
+    def _load_features(self, mat_file):
+        print(f'{IDENTITY} Loading .mat file: {mat_file}')
         if not os.path.exists(mat_file):
-            print('##### .mat does not exist. Change config[load_precomputed_visual] to False')
+            print(f'{IDENTITY} .mat does not exist. Change config[load_precomputed_visual] to False')
 
         raw_mat = scipy.io.loadmat(mat_file)
         img_ids = self.data['img_id'].to_numpy() - 1
 
-        if mat_file.split('/')[-1] == 'res101.mat':
+        if mat_file.split('/')[-1] == 'res101.mat':  # Special case of a resnet101 mat
             raw_labels = raw_mat['labels'].transpose()[-1].tolist()
             raw_features = raw_mat['features'].transpose().tolist()
 
@@ -169,8 +173,8 @@ class Cub2011(Dataset):
         save_path = f"{self.config['save_visual_features']}{self.config['image_encoder']}.mat"
 
         if os.path.exists(save_path):
-            print("##### Model already used to extract visual features. Using _load_precomputed")
-            self._load_precomputed(save_path)
+            print(f"{IDENTITY} Model already used to encode images. Using _load_features() instead")
+            self._load_features(save_path)
         else:
             img_paths = [os.path.join(self.root, self.base_folder, img) for img in self.data['filepath']]  # Maybe.tolist()
 
@@ -201,7 +205,6 @@ class Cub2011(Dataset):
         with tarfile.open(os.path.join(self.root, self.filename), "r:gz") as tar:
             tar.extractall(path=self.root)
 
-
     def insert_generated_features(self, generated_features, labels):
         """Function used to insert generated features for Generative Zero Shot Learning
 
@@ -215,4 +218,3 @@ class Cub2011(Dataset):
     def eval(self):
         '''Function to set self.evaluation True and False to change __getitem__() return'''
         self.evaluation = False if self.evaluation else True
-

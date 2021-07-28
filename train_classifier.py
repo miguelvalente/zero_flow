@@ -18,7 +18,7 @@ import wandb
 from act_norm import ActNormBijection
 from affine_coupling import AffineCoupling
 from convert import VisualExtractor
-from dataloaders.cub2011 import Cub2011Zero, Cub2011Zero_Pre
+from dataloaders.cub2011 import Cub2011
 from distributions import DoubleDistribution, SemanticDistribution
 from nets import Classifier
 from permuters import LinearLU, Permuter, Reverse
@@ -31,35 +31,33 @@ os.environ['WANDB_MODE'] = 'offline'
 # os.environ['WANDB_NAME'] = 'INN'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-save = False
-
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
-                 config=r'config/finetune_conf.yaml')
+                 config=r'config/classifier.yaml')
+
+with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
+    wandb.config.update(yaml.safe_load(d))
+    wandb.config.update(yaml.safe_load(c))
 
 wandb.config['checkpoint'] = 'dazzling-sound-1-340.pth'
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
+wandb.config.update(state['config'])
 
 config = wandb.config
-generator_config = state['config']
-wandb.config['text_encoder'] = generator_config['text_encoder']
-wandb.config['image_encoder'] = generator_config['image_encoder']
 
 normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
                                      std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
-# normalize_imagenet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-#                                           std=[0.229, 0.224, 0.225])
 
 transforms_cub = transforms.Compose([
-    VisualExtractor(generator_config['image_encoder'])
+    VisualExtractor(config['image_encoder'])
 ])
 
-cub = Cub2011Zero_Pre(root='/project/data/', test=config['test'], split=config['split'], config=config, transform=transforms_cub)
+cub = Cub2011(root='/project/data/', zero_shot=True, config=config, transform=transforms_cub)
 generation_ids = cub.generation_ids
 imgs_per_class = cub.imgs_per_class
 
-context_encoder = ContextEncoder(generator_config, generation_ids=generation_ids, device=device, generation=True)
+context_encoder = ContextEncoder(config=config, device=device)
 contexts = context_encoder.contexts.to(device)
 
 input_dim = 2048  # cub[0][0].shape.numel()
@@ -68,34 +66,34 @@ split_dim = input_dim - context_dim
 
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 
-if generator_config['permuter'] == 'random':
+if config['permuter'] == 'random':
     permuter = lambda dim: Permuter(permutation=torch.randperm(dim, dtype=torch.long).to(device))
-elif generator_config['permuter'] == 'reverse':
+elif config['permuter'] == 'reverse':
     permuter = lambda dim: Reverse(dim_size=dim)
-elif generator_config['permuter'] == 'LinearLU':
+elif config['permuter'] == 'LinearLU':
     permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
 
-if generator_config['non_linearity'] == 'relu':
+if config['non_linearity'] == 'relu':
     non_linearity = torch.nn.ReLU()
-elif generator_config['non_linearity'] == 'prelu':
+elif config['non_linearity'] == 'prelu':
     non_linearity = nn.PReLU(init=0.01)
-elif generator_config['non_linearity'] == 'leakyrelu':
+elif config['non_linearity'] == 'leakyrelu':
     non_linearity = nn.LeakyReLU()
 
-if not generator_config['hidden_dims']:
+if not config['hidden_dims']:
     hidden_dims = [input_dim // 2]
 else:
-    hidden_dims = generator_config['hidden_dims']
+    hidden_dims = config['hidden_dims']
 
 transforms = []
-for index in range(generator_config['block_size']):
-    if generator_config['act_norm']:
+for index in range(config['block_size']):
+    if config['act_norm']:
         transforms.append(ActNormBijection(input_dim, data_dep_init=True))
     transforms.append(permuter(input_dim))
     transforms.append(AffineCoupling(
         input_dim,
         split_dim,
-        context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=generator_config['net']))
+        context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=config['net']))
 
 generator = Flow(transforms)  # No base distribution needs to be passed since we only want generation
 generator.load_state_dict(state['state_dict'])
@@ -123,7 +121,7 @@ try:  # Deletes genererator model since its not used anymore
 except Exception:
     print("Failed to delete generator or clear CUDA cache memory")
 
-train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
+train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size_c'], shuffle=True, pin_memory=True)
 val_loader = torch.utils.data.DataLoader(cub, batch_size=1000, shuffle=True, pin_memory=True)
 
 model = Classifier(input_dim, config['num_classes'])
@@ -134,10 +132,10 @@ print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameter
 run.watch(model)
 
 loss_fn = nn.CrossEntropyLoss().to(device)
-optimizer = optim.Adam(model.parameters(), lr=config['lr'])
+optimizer = optim.Adam(model.parameters(), lr=config['lr_c'])
 tau = config['tau']
 tau = torch.tensor(tau).to(device)
-for epoch in range(config['epochs']):
+for epoch in range(config['epochs_c']):
     losses = []
     #  for batch_idx, (input, target) in enumerate(loader):
     for data, targets, seen_or_unseen in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):

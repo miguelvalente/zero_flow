@@ -1,13 +1,16 @@
-epochs:
+zero_test:
+  desc: The type of classification to be performed
+  value: seen #unseen seen_unseen all_with_text
+epochs_c:
   desc: Number of epochs to train over
   value: 150
-batch_size:
+batch_size_c:
   desc: Size of each batch
   value: 128
-lr:
+lr_c:
   desc: Learning rate
   value: 0.005
-num_classes:
+num_classes_:
   desc: Number of classes to use
   value: 150  # Number of classes in CUB2011
 test:

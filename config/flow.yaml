@@ -1,10 +1,10 @@
-epochs:
+epochs_f:
   desc: Number of epochs to train over
   value: 21
-batch_size:
+batch_size_f:
   desc: Size of each batch
   value: 256
-lr:
+lr_f:
   desc: Learning rate
   value: 0.0005
 block_size:
@@ -37,18 +37,9 @@ act_norm:
 dataset:
   desc: which dataset to use
   value: cub2011 #imagenet
-glove_dir:
-  desc: directory for glove
-  value: /project/data/glove.840B.300d.txt # /project/data/image_net/train
-text_encoder:
-  desc: which text encoder to use
-  value: glove #albert #bart #albert  # prophet_net
 model_name:
   desc: model name of text encoder
   value: albert-base-v2 # albert-xxlarge-v2
-image_encoder:
-  desc: pretrained weights
-  value: resnet50d # efficientnet_b2
 summary_extraction_mode:
   desc: type of extraction mode
   value: mean_tokens

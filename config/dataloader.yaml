@@ -1,4 +1,5 @@
-save_visual_features: 'data/CUB_200_2011/mat/'
-load_precomputed_visual: False
+save_visual_features: 'data/CUB_200_2011/mat/visual'
+load_precomputed_visual: True
 #mat_file: 'data/xlsa17/data/CUB/resnet101.mat'
-mat_file: 'data/CUB_200_2011/mat/resnet50d.mat'
+mat_file_visual: 'data/CUB_200_2011/mat/visual/resnet50d.mat'
+image_encoder: resnet50d # efficientnet_b2

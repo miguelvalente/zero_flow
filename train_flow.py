@@ -30,9 +30,9 @@ os.environ['WANDB_MODE'] = 'offline'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
-                 config=r'config/flow_conf.yaml')
+                 config=r'config/flow.yaml')
 
-with open('config/dataloader.yaml', 'r') as d, open('config/dataloader.yaml', 'r') as c:
+with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
     wandb.config.update(yaml.safe_load(d))
     wandb.config.update(yaml.safe_load(c))
 
@@ -51,7 +51,7 @@ contexts = context_encoder.contexts.to(device)
 cs = contexts[seen_id].to(device)
 cu = contexts[unseen_id].to(device)
 
-train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
+train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size_f'], shuffle=True, pin_memory=True)
 
 cub_val = Cub2011(which_split='test', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
@@ -102,9 +102,9 @@ model = model.to(device)
 
 print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameters()])}')
 run.watch(model)
-optimizer = optim.Adam(model.parameters(), lr=config['lr'])
+optimizer = optim.Adam(model.parameters(), lr=config['lr_f'])
 
-for epoch in range(1, config['epochs']):
+for epoch in range(1, config['epochs?f']):
     losses = []
     for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
