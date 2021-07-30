@@ -4,3 +4,4 @@ load_precomputed_text: True
 mat_file_text: 'data/xlsa17/data/CUB/att_splits.mat'
 glove_dir: /project/data/glove.6B.50d.txt # /project/data/image_net/train
 text_encoder: manual #glove #albert #bart #albert  # prophet_net
+model_name: manual # albert-base-v2 # albert-xxlarge-v2

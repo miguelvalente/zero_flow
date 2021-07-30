@@ -185,9 +185,8 @@ class StandardNormal(Distribution):
         log_inner = - 0.5 * x**2
         return sum_except_batch(log_base + log_inner, num_dims=2)
 
-    def sample(self, num_samples, context=None, n_points=None):
-        sample_shape = list(self.shape)
-        sample_shape[-2] = n_points
+    def sample(self, num_samples, n_points=None):
+        sample_shape = [n_points] + list(self.shape)
         return torch.randn(num_samples, *sample_shape, device=self.buffer.device, dtype=self.buffer.dtype)
 
 class Normal(Distribution):
@@ -210,10 +209,10 @@ class Normal(Distribution):
 
 
 class SemanticDistribution(Distribution):
-    def __init__(self, locs, scale, shape):
+    def __init__(self, locs, scale):
         super().__init__()
-        self.std_normal = StandardNormal(shape)
-        self.shape = torch.Size(shape)
+        self.shape = scale.shape
+        self.std_normal = StandardNormal(self.shape)
         self.register_buffer('locs', locs)
         self.register_buffer('scale', scale)
 
@@ -223,8 +222,7 @@ class SemanticDistribution(Distribution):
 
     def sample(self, num_samples, context=None, n_points=None):
         sample_shape = list(self.shape)
-        sample_shape[-2] = n_points
-        return (self.std_normal.sample(num_samples=num_samples, n_points=n_points, context=None) * self.scale) + self.locs[context]
+        return (self.std_normal.sample(num_samples=num_samples, n_points=n_points).to(self.locs.device) * self.scale) + self.locs[context]
 
 
 class DoubleDistribution(TorchDistribution):

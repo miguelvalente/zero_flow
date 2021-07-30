@@ -37,9 +37,6 @@ act_norm:
 dataset:
   desc: which dataset to use
   value: cub2011 #imagenet
-model_name:
-  desc: model name of text encoder
-  value: albert-base-v2 # albert-xxlarge-v2
 summary_extraction_mode:
   desc: type of extraction mode
   value: mean_tokens
@@ -58,6 +55,3 @@ max_length:
 split:
   desc: what split is being used
   value: proposed_split1.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
-
-
-   

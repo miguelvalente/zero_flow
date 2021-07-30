@@ -28,10 +28,10 @@ from transform import Flow
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
 os.environ['WANDB_MODE'] = 'offline'
-# os.environ['WANDB_NAME'] = 'INN'
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-run = wandb.init(project='zero_inference_CUB', entity='mvalente',
+run = wandb.init(project='zero_classifier_CUB', entity='mvalente',
                  config=r'config/classifier.yaml')
 
 with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
@@ -64,6 +64,7 @@ input_dim = 2048  # cub[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
+semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 
 if config['permuter'] == 'random':
@@ -105,10 +106,13 @@ labels = []
 with torch.no_grad():
     for idx, class_id in enumerate(tqdm.tqdm(generation_ids, desc='Generating Features')):
         number_samples = imgs_per_class[class_id]
+        if config['context_sampling']:
+            pass
+        else:
+            generated_features.append(generator.generation(
+                torch.hstack((contexts[idx].repeat(number_samples).reshape(-1, context_dim),
+                              visual_distribution.sample([number_samples])))))
 
-        generated_features.append(generator.generation(
-            torch.hstack((contexts[idx].repeat(number_samples).reshape(-1, context_dim),
-                          visual_distribution.sample([number_samples])))))
 
 generated_features = torch.cat(generated_features, dim=0).to('cpu')
 

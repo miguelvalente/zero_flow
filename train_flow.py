@@ -26,10 +26,10 @@ from transform import Flow
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'online'
+os.environ['WANDB_MODE'] = 'offline'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-run = wandb.init(project='zero_flow_CUB', entity='mvalente',
+run = wandb.init(project='zero_flow_CUB_2.0', entity='mvalente',
                  config=r'config/flow.yaml')
 
 with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
@@ -61,7 +61,6 @@ input_dim = cub_train[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
-semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 base_dist = DoubleDistribution(visual_distribution, semantic_distribution, input_dim, context_dim)
 
