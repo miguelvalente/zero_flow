@@ -2,10 +2,11 @@ import torch
 import numpy as np
 from transformers import AlbertTokenizer, AlbertModel, ProphetNetTokenizer, ProphetNetEncoder, BartForConditionalGeneration, BartTokenizer
 import utils
-from text_encoders.text_encoder_utils import split_with_overlap
 
-# Adapted to PyTorch and to my use case from https://github.com/sebastianbujwid/zsl_text_imagenet.git
 class BaseEncoder:
+    ''' BaseEncoder is the Parent class used by all text encoders
+        Adapted to PyTorch and to my use case from https://github.com/sebastianbujwid/zsl_text_imagenet.git
+    '''
     def extract_text_summary(self, last_hidden_states, attention_mask):
         mode = self.summary_extraction_mode
 
@@ -16,7 +17,6 @@ class BaseEncoder:
             m = utils.reduce_sum_masked(last_hidden_states, mask=attention_mask.unsqueeze(-1), axis=1)
             return m
         else:
-            # TODO - try other methods
             raise NotImplementedError()
 
     def encode_long_text(self, long_text, batch=32):
@@ -64,6 +64,23 @@ class BaseEncoder:
         else:
             # TODO - try other methods
             raise NotImplementedError()
+
+    
+    def split_with_overlap(text, max_length, overlap_window_length, tokenize_func=lambda x: x.split()):
+        assert overlap_window_length < max_length
+
+        tokens = tokenize_func(text)
+        if len(tokens) < max_length:
+            return [' '.join(tokens)]
+
+        split_text = []
+        i = 0
+        while (i + overlap_window_length) <= len(tokens):
+            part = tokens[i:i + max_length]
+            split_text.append(' '.join(part))
+            i += max_length - overlap_window_length
+
+        return split_text
 
 class BartEncoder(BaseEncoder):
     def __init__(self, config, device):
