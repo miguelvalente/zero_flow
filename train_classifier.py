@@ -34,7 +34,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf.yaml')
 
-wandb.config['checkpoint'] = 'dazzling-sound-1-340.pth'
+wandb.config['checkpoint'] = 'gallant-sponge-13-20.pth'
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']

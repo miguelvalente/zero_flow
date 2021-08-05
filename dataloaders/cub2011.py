@@ -190,7 +190,6 @@ class Cub2011Zero(Cub2011_Base):
 
 class Cub2011_Pre(Cub2011_Base):
     def _load_metadata(self):
-        raw_res = scipy.io.loadmat('data/xlsa17/data/CUB/res101.mat')
 
         images = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'images.txt'), sep=' ',
                              names=['img_id', 'filepath'])
@@ -209,6 +208,7 @@ class Cub2011_Pre(Cub2011_Base):
             self.data = self.data[self.data.is_training_img == 1]
         elif self.which_split == 'val':
             self.data = self.data[self.data.is_training_img == 0]
+            self.val_id = self.data[self.data.is_training_img == 0].target.unique() - 1
         elif self.which_split == 'test':
             self.data = self.data[self.data.is_training_img == 2]
             self.test_id = self.data[self.data.is_training_img == 2].target.unique() - 1
@@ -217,7 +217,19 @@ class Cub2011_Pre(Cub2011_Base):
 
         ids = self.data['img_id'].to_numpy() - 1
 
-        self.visual_features = torch.from_numpy(raw_res['features'].transpose()[ids]).type(torch.float32)
+        if self.config['visual_order']:
+            raw_res = scipy.io.loadmat('data/xlsa17/data/CUB/res101.mat')
+            raw_res = scipy.io.loadmat('data/CUB_200_2011/mat/visual/res101_ordered.mat')
+            features = raw_res['features']
+            self.visual_features = torch.from_numpy(features).type(torch.float32)[ids]
+
+            # labels = raw_res['labels']
+            # features = raw_res['features'].transpose()
+            # features_ordered = torch.stack([torch.from_numpy(f).type(torch.float32) for _, f in sorted(zip(labels, features), key=lambda pair: pair[0])])
+            # self.visual_features = features_ordered[ids]
+        else:
+            raw_res = scipy.io.loadmat('data/xlsa17/data/CUB/res101.mat')
+            self.visual_features = torch.from_numpy(raw_res['features'].transpose()[ids]).type(torch.float32)
         self.targets = self.data['target'].to_list()
 
     def __getitem__(self, idx):

@@ -104,15 +104,24 @@ class ContextEncoder():
         return article_correspondences, articles
 
     def load_contexts_cub2011(self):
-        raw_att = scipy.io.loadmat('data/xlsa17/data/CUB/att_splits.mat')
-
-        if self.generation:
-            self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
-            self.contexts = self.contexts[self.generation_ids]
+        if self.config['text_order']:
+            raw_att = scipy.io.loadmat('data/CUB_200_2011/mat/text/att_splits_ordered.mat')
+            if self.generation:
+                self.contexts = torch.from_numpy(raw_att['features']).type(torch.float32)
+                self.contexts = self.contexts[self.generation_ids]
+            else:
+                self.contexts = torch.from_numpy(raw_att['features']).type(torch.float32)
+                self.cs = self.contexts[self.seen_id]
+                self.cu = self.contexts[self.unseen_id]
         else:
-            self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
-            self.cs = self.contexts[self.seen_id]
-            self.cu = self.contexts[self.unseen_id]
+            raw_att = scipy.io.loadmat('data/xlsa17/data/CUB/att_splits.mat')
+            if self.generation:
+                self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
+                self.contexts = self.contexts[self.generation_ids]
+            else:
+                self.contexts = torch.from_numpy(raw_att['att'].transpose()).type(torch.float32)
+                self.cs = self.contexts[self.seen_id]
+                self.cu = self.contexts[self.unseen_id]
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

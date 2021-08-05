@@ -33,7 +33,7 @@ non_linearity:
   value: prelu # relu leakyrelu
 act_norm:
   desc: presence of actnorm
-  value: true
+  value: false
 dataset:
   desc: which dataset to use
   value: manual_cub2011 #imagenet

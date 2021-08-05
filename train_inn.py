@@ -25,16 +25,18 @@ import torchvision.transforms as transforms
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inn_CUB', entity='mvalente',
                  config=r'config/inn_conf.yaml')
 
+wandb.config['text_order'] = False
+wandb.config['visual_order'] = True
 config = wandb.config
 
-cub_train = Cub2011_Pre(which_split='train', root='/project/data/', split=config['split'])
+cub_train = Cub2011_Pre(config=config, which_split='train', root='/project/data/', split=config['split'])
 seen_id = cub_train.seen_id
 unseen_id = cub_train.unseen_id
 
@@ -45,9 +47,9 @@ cu = context_encoder.cu.to(device)
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-cub_val = Cub2011_Pre(which_split='test', root='/project/data/', split=config['split'], download=False)
+cub_val = Cub2011_Pre(config=config, which_split='val', root='/project/data/', split=config['split'], download=False)
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
-test_id = cub_val.test_id
+test_id = cub_val.val_id
 
 input_dim = cub_train[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()

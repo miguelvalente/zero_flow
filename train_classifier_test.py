@@ -30,17 +30,22 @@ os.environ['WANDB_MODE'] = 'online'
 os.environ['WANDB_NAME'] = 'generated_seen_INN'
 save = False
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf_test.yaml')
 
-wandb.config['checkpoint'] = 'dazzling-sound-1-20.pth'
+wandb.config['checkpoint'] = 'eternal-valley-21-20.pth'
+wandb.config['text_order'] = False
+wandb.config['visual_order'] = True
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
 
 config = wandb.config
 generator_config = state['config']
+generator_config['text_order'] = config['text_order']
+generator_config['visual_order'] = config['visual_order']
 wandb.config['text_encoder'] = generator_config['text_encoder']
 wandb.config['image_encoder'] = generator_config['image_encoder']
 
@@ -184,7 +189,7 @@ for epoch in range(config['epochs']):
             # wandb.log({"Acc_unseen": accuracy_unseen})
 
             cub.eval()  # Switch dataset return to img, target
-    # print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')
+    print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')
     if loss.isnan():
         print('Nan in loss!')
         raise Exception('Nan in loss!')
