@@ -25,15 +25,21 @@ wt_c_l:
 wt_mmd_l:
   desc: weight for the mmd loss
   value: 0.1
-net:
-  desc: type olf MLP
-  value: MLP #MLPR # MLP
 non_linearity:
   desc: non linear function for Affine Coupling
   value: leakyrelu # prelu # relu leakyrelu
 act_norm:
   desc: presence of actnorm
-  value: true
+  value: True
+minmax_rescale:
+  desc: features being min max rescaled 
+  value: True
+aff_eps:
+  desc: value for eps on affine_coupling.py
+  value: 1E-1
+lu_eps:
+  desc: eps value for Lupermute
+  value: 1E-5
 dataset:
   desc: which dataset to use
   value: cub2011 #imagenet

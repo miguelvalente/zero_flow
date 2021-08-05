@@ -123,7 +123,7 @@ class AlbertEncoder(BaseEncoder):
     def __init__(self, config, device):
         self.config = config
         self.device = device
-        model_name = self.config['model_name']
+        model_name = self.config['text_encoder']
         self.tokenizer = AlbertTokenizer.from_pretrained(model_name)
         self.model = AlbertModel.from_pretrained(model_name)
         self.model = self.model.to(device)

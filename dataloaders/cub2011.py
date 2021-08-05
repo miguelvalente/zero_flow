@@ -4,9 +4,8 @@ from collections import Counter
 
 import numpy.random as random
 import pandas as pd
-import scipy.io
 import torch
-from scipy.io import savemat
+from scipy.io import loadmat, savemat
 from torch.utils.data import Dataset
 from torchvision.datasets.folder import default_loader
 from torchvision.datasets.utils import download_url
@@ -36,16 +35,13 @@ class Cub2011(Dataset):
         if download:
             self._download()
 
-        self._check_integrity():
+        self._check_integrity()
 
     def __getitem__(self, idx):
         if self.zero_shot:
             if self.evaluation:
                 img = self.visual_features[idx]
                 target = self.targets[idx]
-                seen_or_unseen = self.seen_unseen[idx]
-
-                return img, target, seen_or_unseen  # unseen = 0 / seen = 1
             else:
                 if random.choice(self.config['randomness']) == 0:
                     target = self.targets[idx]
@@ -59,14 +55,12 @@ class Cub2011(Dataset):
                     img = self.generated_features[idx]
                     target = self.targets[idx]
                     self.test_gen.append(target)
-
-                seen_or_unseen = self.seen_unseen[idx]
-                return img, target, seen_or_unseen
         else:
             img = self.visual_features[idx]
             target = self.targets[idx]
 
-            return img, target
+        seen_or_unseen = self.seen_unseen[idx]
+        return img, target, seen_or_unseen
 
     def __len__(self):
         return len(self.data)
@@ -83,7 +77,7 @@ class Cub2011(Dataset):
                 filepath = os.path.join(self.root, self.base_folder, row.filepath)
                 if not os.path.isfile(filepath):
                     print(f'{IDENTITY} Filepath not found: {filepath}')
-        except Exception
+        except Exception:
             return False
 
         try:
@@ -94,7 +88,6 @@ class Cub2011(Dataset):
         except Exception:
             print(f'{IDENTITY} Error loading visual features')
             return False
-
 
     def _load_metadata(self):
         images = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'images.txt'), sep=' ',
@@ -128,7 +121,6 @@ class Cub2011(Dataset):
 
             self.targets = list(self.data['target'] - 1)
             self.imgs_per_class = Counter(self.targets)
-            self.seen_unseen = self.data['is_training_img'].to_list()
 
             self.test_gen = []
             self.test_real = []
@@ -144,28 +136,26 @@ class Cub2011(Dataset):
             else:
                 print('Split role not defined')
 
+        self.seen_unseen = self.data['is_training_img'].to_list()
+
     def _load_features(self, mat_file):
         print(f'{IDENTITY} Loading .mat file: {mat_file}')
         if not os.path.exists(mat_file):
-            print(f'{IDENTITY} .mat does not exist. Change config[load_precomputed_visual] to False')
-
-        raw_mat = scipy.io.loadmat(mat_file)
-        img_ids = self.data['img_id'].to_numpy() - 1
-
-        if mat_file.split('/')[-1] == 'res101.mat':  # Special case of a resnet101 mat
-            raw_labels = raw_mat['labels'].transpose()[-1].tolist()
-            raw_features = raw_mat['features'].transpose().tolist()
-
-            # Ensures that features are ordered in ascending order according to labels
-            raw_features = [v for _, v in sorted(zip(raw_labels, raw_features), key=lambda pair: pair[0])]
+            print(f'{IDENTITY} .mat does not exist. Loading not possible using _encode_images() instead.')
+            self._encode_images()
         else:
+            raw_mat = loadmat(mat_file)
             raw_features = raw_mat['features'].tolist()
-            raw_labels = raw_mat['labels'].tolist()
 
-        features = torch.stack([torch.tensor(v).type(torch.float32) for v in raw_features])
+            features = torch.stack([torch.tensor(v).type(torch.float32) for v in raw_features])
 
-        self.visual_features = features[img_ids]
-        self.targets = list(self.data['target'] - 1)
+            if self.config['minmax_rescale']:
+                features_std = (features - features.min(axis=0).values) / (features.max(axis=0).values - features.min(axis=0).values)
+                features = features_std * 1
+
+            img_ids = self.data['img_id'].to_numpy() - 1
+            self.visual_features = features[img_ids]
+            self.targets = list(self.data['target'] - 1)
 
     def _encode_images(self):
         save_path = f"{self.config['save_visual_features']}{self.config['image_encoder']}.mat"

@@ -27,31 +27,32 @@ from transform import Flow
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 run = wandb.init(project='zero_classifier_CUB', entity='mvalente',
                  config=r'config/classifier.yaml')
 
-with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
-    wandb.config.update(yaml.safe_load(d))
-    wandb.config.update(yaml.safe_load(c))
-
-wandb.config['checkpoint'] = 'fresh-paper-140-20.pth'
+wandb.config['checkpoint'] = 'twilight-gorge-34-20.pth'
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
 wandb.config.update(state['config'])
 
+with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
+    wandb.config.update(yaml.safe_load(d))
+    wandb.config.update(yaml.safe_load(c), allow_val_change=True)
+
+wandb.config['image_encoder'] = wandb.config['mat_file_visual'].split('/')[-1].split('.')[0]
 config = wandb.config
 
-normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
-                                     std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
-
-transforms_cub = transforms.Compose([
-    VisualExtractor(config['image_encoder'])
-])
+if config['image_encoder'] != 'res101_ordered':
+    transforms_cub = transforms.Compose([
+        VisualExtractor(config['image_encoder'])
+    ])
+else:
+    transforms_cub = None
 
 cub = Cub2011(root='/project/data/', zero_shot=True, config=config, transform=transforms_cub)
 generation_ids = cub.generation_ids
@@ -60,11 +61,11 @@ imgs_per_class = cub.imgs_per_class
 context_encoder = ContextEncoder(config=config, device=device)
 contexts = context_encoder.contexts.to(device)
 
-input_dim = 2048  # cub[0][0].shape.numel()
+input_dim = 2048
 context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
-semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))
+semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device))
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 
 if config['permuter'] == 'random':
@@ -72,7 +73,7 @@ if config['permuter'] == 'random':
 elif config['permuter'] == 'reverse':
     permuter = lambda dim: Reverse(dim_size=dim)
 elif config['permuter'] == 'LinearLU':
-    permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
+    permuter = lambda dim: LinearLU(num_features=dim, eps=float(config['lu_eps']))
 
 if config['non_linearity'] == 'relu':
     non_linearity = torch.nn.ReLU()
@@ -94,7 +95,7 @@ for index in range(config['block_size']):
     transforms.append(AffineCoupling(
         input_dim,
         split_dim,
-        context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=config['net']))
+        context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, eps=float(config['aff_eps'])))
 
 generator = Flow(transforms)  # No base distribution needs to be passed since we only want generation
 generator.load_state_dict(state['state_dict'])
@@ -105,13 +106,16 @@ generated_features = []
 labels = []
 with torch.no_grad():
     for idx, class_id in enumerate(tqdm.tqdm(generation_ids, desc='Generating Features')):
-        number_samples = imgs_per_class[class_id]
+        num_samples = imgs_per_class[class_id]
         if config['context_sampling']:
-            pass
+            s = semantic_distribution.sample(num_samples=num_samples, n_points=1, context=idx).reshape(num_samples, -1)
+            v = visual_distribution.sample([num_samples])
+            prime_generation = torch.cat((s, v), axis=1)
+            generated_features.append(generator.generation(prime_generation))
         else:
             generated_features.append(generator.generation(
-                torch.hstack((contexts[idx].repeat(number_samples).reshape(-1, context_dim),
-                              visual_distribution.sample([number_samples])))))
+                torch.hstack((contexts[idx].repeat(num_samples).reshape(-1, context_dim),
+                              visual_distribution.sample([num_samples])))))
 
 
 generated_features = torch.cat(generated_features, dim=0).to('cpu')
@@ -137,12 +141,12 @@ run.watch(model)
 
 if config['tau']:
     loss_fn = nn.CrossEntropyLoss(reduction='none').to(device)
+    tau = config['tau']
+    tau = torch.tensor(tau).to(device)
 else:
     loss_fn = nn.CrossEntropyLoss().to(device)
 
-optimizer = optim.Adam(model.parameters(), lr=config['lr_c'])
-tau = config['tau']
-tau = torch.tensor(tau).to(device)
+optimizer = optim.Adam(model.parameters(), lr=config['lr_c'], weight_decay=0.1)
 for epoch in range(config['epochs_c']):
     losses = []
     for data, targets, seen_or_unseen in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
@@ -209,8 +213,7 @@ for epoch in range(config['epochs_c']):
 
             if 'seen' in config['zero_test'] and 'zero' in config['zero_test']:
                 if accuracy_seen != 0 and accuracy_unseen != 0:
-                    harmonic_mean = 2 / (1 / accuracy_seen +
-                                         1 / accuracy_unseen)
+                    harmonic_mean = 2 / (1 / accuracy_seen + 1 / accuracy_unseen)
                 wandb.log({"Harmonic Mean": harmonic_mean})
 
             if 'all' in config['zero_test']:

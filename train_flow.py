@@ -26,7 +26,7 @@ from transform import Flow
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_flow_CUB_2.0', entity='mvalente',
@@ -36,11 +36,15 @@ with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml
     wandb.config.update(yaml.safe_load(d))
     wandb.config.update(yaml.safe_load(c))
 
+wandb.config['image_encoder'] = wandb.config['mat_file_visual'].split('/')[-1].split('.')[0]
 config = wandb.config
 
-transforms_cub = transforms.Compose([
-    VisualExtractor(config['image_encoder'])
-])
+if config['image_encoder'] != 'res101_ordered':
+    transforms_cub = transforms.Compose([
+        VisualExtractor(config['image_encoder'])
+    ])
+else:
+    transforms_cub = None
 
 cub_train = Cub2011(which_split='train', root='/project/data/', config=config, transform=transforms_cub)
 seen_id = cub_train.seen_id
@@ -57,10 +61,11 @@ cub_val = Cub2011(which_split='test', root='/project/data/', config=config, tran
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
 test_id = cub_val.test_id
 
-input_dim = cub_train[0][0].shape.numel()
+input_dim = 2048
 context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
+semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device))
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 base_dist = DoubleDistribution(visual_distribution, semantic_distribution, input_dim, context_dim)
 
@@ -71,7 +76,7 @@ elif config['permuter'] == 'reverse':
 elif config['permuter'] == 'manual':
     permuter = lambda dim: Permuter(permutation=torch.tensor([2, 3, 0, 1], dtype=torch.long).to(device))
 elif config['permuter'] == 'LinearLU':
-    permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
+    permuter = lambda dim: LinearLU(num_features=dim, eps=float(config['lu_eps']))
 
 if config['non_linearity'] == 'relu':
     non_linearity = torch.nn.ReLU()
@@ -93,7 +98,7 @@ for index in range(config['block_size']):
     transforms.append(AffineCoupling(
         input_dim,
         split_dim,
-        context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=config['net']))
+        context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, eps=float(config['aff_eps'])))
 
 model = Flow(transforms, base_dist)
 model.train()
@@ -105,7 +110,11 @@ optimizer = optim.Adam(model.parameters(), lr=config['lr_f'])
 
 for epoch in range(1, config['epochs_f']):
     losses = []
-    for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
+    loss = 0
+    loss_flow = 0
+    centralizing_loss = 0
+    mmd_loss = 0
+    for data, targets, _ in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
 
@@ -144,7 +153,7 @@ for epoch in range(1, config['epochs_f']):
             mmd_loss_val = 0
             loss_val = 0
             losses_val = []
-            for data_val, targets_val in tqdm.tqdm(val_loader, desc=f'Validation Epoch({epoch})'):
+            for data_val, targets_val, _ in tqdm.tqdm(val_loader, desc=f'Validation Epoch({epoch})'):
                 data_val = data_val.to(device)
                 targets_val = targets_val.to(device)
 

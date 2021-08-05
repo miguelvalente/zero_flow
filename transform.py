@@ -74,6 +74,9 @@ class Flow(Transform):
             log_prob_temp = self.base_dist.log_prob(x, context=context)
         log_prob += self.base_dist.log_prob(x, context=context)
 
+        if log_prob.isnan().any() or log_prob.isinf().any():
+            Exception("Nan or Inf")
+
         return log_prob, log_prob_temp, ldj
 
     def generation(self, z):

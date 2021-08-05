@@ -221,7 +221,6 @@ class SemanticDistribution(Distribution):
         return self.std_normal.log_prob(x, context=None).sum(axis=1)
 
     def sample(self, num_samples, context=None, n_points=None):
-        sample_shape = list(self.shape)
         return (self.std_normal.sample(num_samples=num_samples, n_points=n_points).to(self.locs.device) * self.scale) + self.locs[context]
 
 

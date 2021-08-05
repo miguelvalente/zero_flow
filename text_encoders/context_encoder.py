@@ -45,14 +45,11 @@ class ContextEncoder():
     def _load_features(self, mat_file):
         print(f'{IDENTITY} Loading .mat file: {mat_file}')
         if not os.path.exists(mat_file):
-            print(f'{IDENTITY} .mat does not exist. Change config[load_precomputed_text] to False')
-            raise Exception
-
-        raw_features = scipy.io.loadmat(mat_file)
-
-        if mat_file.split('/')[-1] == 'att_splits.mat':  # Special case
-            self.contexts = torch.from_numpy(raw_features['att'].transpose()).type(torch.float32)
+            print(f'{IDENTITY} .mat does not exist. Loading not possible using _encode_contexts() instead.')
+            self._encode_contexts_cub2011()
         else:
+            raw_features = scipy.io.loadmat(mat_file)
+
             self.contexts = torch.from_numpy(raw_features['features']).type(torch.float32)
 
     def _encode_contexts_cub2011(self):
