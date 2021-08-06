@@ -50,7 +50,8 @@ class ContextEncoder():
         else:
             raw_features = scipy.io.loadmat(mat_file)
 
-            self.contexts = torch.from_numpy(raw_features['features']).type(torch.float32)
+            # self.contexts = torch.from_numpy(raw_features['features']).type(torch.float32)
+            self.contexts = torch.from_numpy(raw_features['att'].transpose()).type(torch.float32)
 
     def _encode_contexts_cub2011(self):
         wiki_dir = '/project/data/Raw_Wiki_Articles/CUBird_WikiArticles'

@@ -1,4 +1,4 @@
 save_visual_features: 'data/CUB_200_2011/mat/visual/'
-load_precomputed_visual: False
+load_precomputed_visual: True
 # mat_file_visual: 'data/CUB_200_2011/mat/visual/resnet50d.mat'
 mat_file_visual: 'data/CUB_200_2011/mat/visual/res101_ordered.mat'

@@ -30,10 +30,10 @@ non_linearity:
   value: leakyrelu # prelu # relu leakyrelu
 act_norm:
   desc: presence of actnorm
-  value: True
+  value: False
 minmax_rescale:
   desc: features being min max rescaled 
-  value: True
+  value: False
 aff_eps:
   desc: value for eps on affine_coupling.py
   value: 1E-1
