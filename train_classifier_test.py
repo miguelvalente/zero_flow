@@ -35,8 +35,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf_test.yaml')
 
-wandb.config['checkpoint'] = 'eternal-valley-21-20.pth'
-wandb.config['text_order'] = False
+wandb.config['checkpoint'] = 'crimson-shape-31-20.pth'
+wandb.config['text_order'] = True
 wandb.config['visual_order'] = True
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")

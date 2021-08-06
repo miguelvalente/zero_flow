@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 2000
+  value: 21
 batch_size:
   desc: Size of each batch
   value: 256
@@ -33,7 +33,7 @@ non_linearity:
   value: prelu # relu leakyrelu
 act_norm:
   desc: presence of actnorm
-  value: false
+  value: True
 dataset:
   desc: which dataset to use
   value: manual_cub2011 #imagenet

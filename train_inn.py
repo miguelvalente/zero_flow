@@ -32,7 +32,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inn_CUB', entity='mvalente',
                  config=r'config/inn_conf.yaml')
 
-wandb.config['text_order'] = False
+wandb.config['text_order'] = True
 wandb.config['visual_order'] = True
 config = wandb.config
 

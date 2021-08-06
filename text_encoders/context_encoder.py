@@ -107,10 +107,14 @@ class ContextEncoder():
         if self.config['text_order']:
             raw_att = scipy.io.loadmat('data/CUB_200_2011/mat/text/att_splits_ordered.mat')
             if self.generation:
-                self.contexts = torch.from_numpy(raw_att['features']).type(torch.float32)
+                self.contexts = torch.from_numpy(raw_att['att']).type(torch.float32)
+                self.contexts = 1 * ((self.contexts - self.contexts.min(axis=0).values)/
+                                     (self.contexts.max(axis=0).values - self.contexts.min(axis=0).values))
                 self.contexts = self.contexts[self.generation_ids]
             else:
-                self.contexts = torch.from_numpy(raw_att['features']).type(torch.float32)
+                self.contexts = torch.from_numpy(raw_att['att']).type(torch.float32)
+                self.contexts = 1 * ((self.contexts - self.contexts.min(axis=0).values)/
+                                     (self.contexts.max(axis=0).values - self.contexts.min(axis=0).values))
                 self.cs = self.contexts[self.seen_id]
                 self.cu = self.contexts[self.unseen_id]
         else:

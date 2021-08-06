@@ -67,7 +67,10 @@ class Cub2011(Dataset):
             raw_res = scipy.io.loadmat('data/xlsa17/data/CUB/res101.mat')
             raw_res = scipy.io.loadmat('data/CUB_200_2011/mat/visual/res101_ordered.mat')
             features = raw_res['features']
-            self.visual_features = torch.from_numpy(features).type(torch.float32)[ids]
+            self.visual_features = torch.from_numpy(features).type(torch.float32)
+            self.visual_features = 1 * ((self.visual_features - self.visual_features.min(axis=0).values) /
+                                        (self.visual_features.max(axis=0).values - self.visual_features.min(axis=0).values))
+            self.visual_features = self.visual_features[ids]
 
             # labels = raw_res['labels']
             # features = raw_res['features'].transpose()
