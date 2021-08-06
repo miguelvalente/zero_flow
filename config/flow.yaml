@@ -1,0 +1,72 @@
+epochs:
+  desc: Number of epochs to train over
+  value: 21
+batch_size:
+  desc: Size of each batch
+  value: 256
+lr:
+  desc: Learning rate
+  value: 0.0005
+block_size:
+  desc: Number of blocks
+  value: 5
+hidden_dims:
+  desc: Number of hidden dims and their dimensions
+  value: [1024]
+permuter:
+  desc: type of permutation
+  value: LinearLU # manual reverse random manual
+wt_f_l:
+  desc: weight for the flow loss
+  value: 2
+wt_c_l:
+  desc: weight for the centralizing loss
+  value: 1
+wt_mmd_l:
+  desc: weight for the mmd loss
+  value: 0.1
+net:
+  desc: type olf MLP
+  value: MLP #MLPR # MLP
+non_linearity:
+  desc: non linear function for Affine Coupling
+  value: prelu # relu leakyrelu
+minmax_rescale:
+  desc: presence of actnorm
+  value: True
+act_norm:
+  desc: presence of actnorm
+  value: True
+dataset:
+  desc: which dataset to use
+  value: manual_cub2011 #imagenet
+glove_dir:
+  desc: directory for glove
+  value: /project/data/glove.840B.300d.txt # /project/data/image_net/train
+model_name:
+  desc: model name of text encoder
+  value: albert-base-v2 # albert-xxlarge-v2
+image_encoder:
+  desc: pretrained weights
+  value: resnet50d # efficientnet_b2
+summary_extraction_mode:
+  desc: type of extraction mode
+  value: mean_tokens
+aggregate_descriptions_method:
+  desc: another aggregation
+  value: mean_representations
+aggregate_long_text_splits_method:
+  desc: type of aggregation
+  value: mean
+overlap_window:
+  desc: how much overlap between articles
+  value: 3
+max_length:
+  desc: max length
+  value: 20
+split:
+  desc: what split is being used
+  value: proposed_split1.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
+
+
+   

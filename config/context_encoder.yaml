@@ -1,0 +1,7 @@
+save_text_features: 'data/CUB_200_2011/mat/text/'
+load_precomputed_text: True
+mat_file_text: 'data/CUB_200_2011/mat/text/att_splits_ordered.mat'
+# mat_file_text: 'data/CUB_200_2011/mat/text/glove.840B.300d.mat'
+# mat_file_text: 'data/xlsa17/data/CUB/att_splits.mat'
+glove_dir: /project/data/glove.840B.300d.txt # /project/data/image_net/train
+text_encoder: glove #albert-base-v2 # manual #glove #albert #bart #albert  # prophet_net

@@ -21,7 +21,7 @@ from dataloaders.cub2011_test import Cub2011
 from distributions import DoubleDistribution, SemanticDistribution
 from nets import Classifier
 from permuters import LinearLU, Permuter, Reverse
-from text_encoders.context_encoder import ContextEncoder
+from text_encoders.context_encoder_base import ContextEncoder
 from transform import Flow
 
 CUDA_LAUNCH_BLOCKING = 1
@@ -35,7 +35,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/finetune_conf_test.yaml')
 
-wandb.config['checkpoint'] = 'crimson-shape-31-20.pth'
+wandb.config['checkpoint'] = 'vibrant-violet-37-20.pth'
 wandb.config['text_order'] = True
 wandb.config['visual_order'] = True
 
