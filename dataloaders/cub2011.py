@@ -17,7 +17,7 @@ class Cub2011(Dataset):
     '''
     Base dataset class for loading up cub
     '''
-    base_folder = '/project/data/CUB_200_2011/images'
+    base_folder = 'CUB_200_2011/images'
     url = 'http://www.vision.caltech.edu/visipedia-data/CUB-200-2011/CUB_200_2011.tgz'
     filename = 'CUB_200_2011.tgz'
     tgz_md5 = '97eceeb196236b17998738112f37df78'
@@ -145,13 +145,12 @@ class Cub2011(Dataset):
             self._encode_images()
         else:
             raw_mat = loadmat(mat_file)
-            raw_features = raw_mat['features'].tolist()
+            raw_features = raw_mat['features']
 
-            features = torch.stack([torch.tensor(v).type(torch.float32) for v in raw_features])
+            features = torch.from_numpy(raw_features).type(torch.float32)
 
             if self.config['minmax_rescale']:
-                features_std = (features - features.min(axis=0).values) / (features.max(axis=0).values - features.min(axis=0).values)
-                features = features_std * 1
+                features = 1 * ((features - features.min(axis=0).values) / (features.max(axis=0).values - features.min(axis=0).values))
 
             img_ids = self.data['img_id'].to_numpy() - 1
             self.visual_features = features[img_ids]

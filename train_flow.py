@@ -46,7 +46,7 @@ if config['image_encoder'] != 'res101_ordered':
 else:
     transforms_cub = None
 
-cub_train = Cub2011(which_split='train', root='/project/data/', config=config, transform=transforms_cub)
+cub_train = Cub2011(which_split='train', root='data', config=config, transform=transforms_cub)
 seen_id = cub_train.seen_id
 unseen_id = cub_train.unseen_id
 
@@ -57,7 +57,7 @@ cu = contexts[unseen_id].to(device)
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size_f'], shuffle=True, pin_memory=True)
 
-cub_val = Cub2011(which_split='test', root='/project/data/', config=config, transform=transforms_cub)
+cub_val = Cub2011(which_split='test', root='data', config=config, transform=transforms_cub)
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
 test_id = cub_val.test_id
 

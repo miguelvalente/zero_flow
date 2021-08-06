@@ -27,13 +27,13 @@ wt_mmd_l:
   value: 0.1
 non_linearity:
   desc: non linear function for Affine Coupling
-  value: leakyrelu # prelu # relu leakyrelu
+  value: prelu # prelu # relu leakyrelu
 act_norm:
   desc: presence of actnorm
   value: False
 minmax_rescale:
   desc: features being min max rescaled 
-  value: False
+  value: True
 aff_eps:
   desc: value for eps on affine_coupling.py
   value: 1E-1
