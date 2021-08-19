@@ -35,8 +35,6 @@ run = wandb.init(project='zero_inference_CUB', entity='mvalente',
                  config=r'config/classifier.yaml')
 
 wandb.config['checkpoint'] = 'splendid-bird-38-20.pth'
-wandb.config['text_order'] = True
-wandb.config['visual_order'] = True
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
@@ -229,64 +227,4 @@ for epoch in range(config['epochs_c']):
     print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')
 
     if loss.isnan():
-        raise Exception('Nan in loss!')
-
-
-loss_fn = nn.CrossEntropyLoss().to(device)
-optimizer = optim.Adam(model.parameters(), lr=config['lr_c'])
-tau = config['tau']
-tau = torch.tensor(tau).to(device)
-for epoch in range(config['epochs_c']):
-    losses = []
-    #  for batch_idx, (input, target) in enumerate(loader):
-    for data, targets, seen_or_unseen in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
-        data = data.to(device)
-        targets = targets.to(device)
-        seen_or_unseen = seen_or_unseen.to(device)
-
-        optimizer.zero_grad()
-        output = model(data)
-        loss = loss_fn(output, targets)
-
-        loss.backward()
-        losses.append(loss.item())
-        optimizer.step()
-        wandb.log({"loss": loss.item()})
-
-    if True:
-        with torch.no_grad():
-            correct_unseen = 0
-            total_unseen = 0
-            accuracy_unseen = 0
-            correct_seen = 0
-            total_seen = 0
-            accuracy_seen = 0
-
-            cub.eval()  # Switch dataset return to img, target, seen_or_unseen
-            for data_val, target_val, seen_or_unseen in tqdm.tqdm(val_loader, desc="Validation"):
-                images = data_val.to(device)
-                labels = target_val.to(device)
-
-                outputs = model(images)
-                _, predicted = torch.max(outputs, 1)
-
-                total_seen += seen_or_unseen[seen_or_unseen == 1].numel()
-                # total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
-
-                # correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
-                correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
-
-            # print(f'correct unseen:{correct_unseen} | total u:{total_unseen}')
-
-            accuracy_seen = correct_seen / total_seen
-            # if correct_unseen != 0:
-                # accuracy_unseen = correct_unseen / total_unseen
-
-            wandb.log({"Acc_seen": accuracy_seen})
-            # wandb.log({"Acc_unseen": accuracy_unseen})
-
-            cub.eval()  # Switch dataset return to img, target
-    print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')
-    if loss.isnan():
-        print('Nan in loss!')
         raise Exception('Nan in loss!')
