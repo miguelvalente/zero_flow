@@ -17,7 +17,7 @@
         "configurations": [],
         "compounds": []
     },
-    "python.pythonPath": "/opt/conda/bin/python",
+    "python.pythonPath": "/home/mvalente/.config/anaconda3/envs/flow/bin/python",
     "python.linting.pycodestyleEnabled": false,
     "python.linting.pylintEnabled": false,
     "python.linting.mypyEnabled": false,
