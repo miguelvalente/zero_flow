@@ -13,6 +13,7 @@ from act_norm import ActNormBijection
 from text_encoders.text_encoder import ProphetNet, AlbertEncoder
 from text_encoders.context_encoder import ContextEncoder
 from dataloaders.cub2011 import Cub2011
+import yaml
 
 import timm
 from PIL import Image
@@ -29,27 +30,27 @@ os.environ['WANDB_MODE'] = 'online'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-run = wandb.init(project='zero_flow_CUB', entity='mvalente',
-                 config=r'config/flow_conf.yaml')
+run = wandb.init(project='zero_inn_CUB', entity='mvalente',
+                 config=r'config/flow.yaml')
+
+with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
+    wandb.config.update(yaml.safe_load(d))
+    wandb.config.update(yaml.safe_load(c))
 
 config = wandb.config
 
-transforms_cub = transforms.Compose([
-    VisualExtractor(config['image_encoder'])
-])
-
-cub_train = Cub2011(which_split='train', root='/project/data/', split=config['split'], transform=transforms_cub)
+cub_train = Cub2011(config=config, which_split='train', root='/project/data/')
 seen_id = cub_train.seen_id
 unseen_id = cub_train.unseen_id
 
-context_encoder = ContextEncoder(config, seen_id=seen_id, unseen_id=unseen_id, device=device)
+context_encoder = ContextEncoder(config, device=device)
 contexts = context_encoder.contexts.to(device)
-cs = context_encoder.cs.to(device)
-cu = context_encoder.cu.to(device)
+cs = contexts[seen_id]
+cu = contexts[unseen_id]
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-cub_val = Cub2011(which_split='test', root='/project/data/', split=config['split'], transform=transforms_cub, download=False)
+cub_val = Cub2011(config=config, which_split='test', root='/project/data/')
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
 test_id = cub_val.test_id
 
@@ -57,7 +58,8 @@ input_dim = cub_train[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
-semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))
+# semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))
+semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device))
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 base_dist = DoubleDistribution(visual_distribution, semantic_distribution, input_dim, context_dim)
 
@@ -82,17 +84,17 @@ if not config['hidden_dims']:
 else:
     hidden_dims = config['hidden_dims']
 
-transforms = []
+transform = []
 for index in range(config['block_size']):
     if config['act_norm']:
-        transforms.append(ActNormBijection(input_dim, data_dep_init=True))
-    transforms.append(permuter(input_dim))
-    transforms.append(AffineCoupling(
+        transform.append(ActNormBijection(input_dim, data_dep_init=True))
+    transform.append(permuter(input_dim))
+    transform.append(AffineCoupling(
         input_dim,
         split_dim,
         context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=config['net']))
 
-model = Flow(transforms, base_dist)
+model = Flow(transform, base_dist)
 model.train()
 model = model.to(device)
 
@@ -102,7 +104,7 @@ optimizer = optim.Adam(model.parameters(), lr=config['lr'])
 
 for epoch in range(1, config['epochs']):
     losses = []
-    for data, targets in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
+    for data, targets, _ in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
 
@@ -128,20 +130,20 @@ for epoch in range(1, config['epochs']):
         losses.append(loss.item())
 
         run.log({"loss": loss.item(),
-                 "loss_flow": loss_flow.item(),  # }, step=epoch)
-                 "loss_central": centralizing_loss.item(),  # }, step=epoch)
+                 "loss_flow": loss_flow.item(),
+                 "loss_central": centralizing_loss.item(),
                  "loss_mmd": mmd_loss.item(),
-                 "ldj": ldj.item(),  # }, step=epoch)
+                 "ldj": ldj.item(),
                  "lg": lg.item()})
 
-    if epoch % 5 == 0:
+    if epoch % 2 == 0:
         with torch.no_grad():
             loss_flow_val = 0
             centralizing_loss_val = 0
             mmd_loss_val = 0
             loss_val = 0
             losses_val = []
-            for data_val, targets_val in tqdm.tqdm(val_loader, desc=f'Validation Epoch({epoch})'):
+            for data_val, targets_val, _ in tqdm.tqdm(val_loader, desc=f'Validation Epoch({epoch})'):
                 data_val = data_val.to(device)
                 targets_val = targets_val.to(device)
 
@@ -156,7 +158,7 @@ for epoch in range(1, config['epochs']):
         run.log({"epoch": epoch})
     print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')
 
-    if epoch % 100 == 0:
+    if epoch % 20 == 0:
         state = {'config': config.as_dict(),
                  'split': config['split'],
                  'state_dict': model.state_dict()}

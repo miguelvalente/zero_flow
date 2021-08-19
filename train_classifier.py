@@ -17,32 +17,37 @@ import wandb
 from act_norm import ActNormBijection
 from affine_coupling import AffineCoupling
 from convert import VisualExtractor
-from dataloaders.cub2011 import Cub2011Zero, Cub2011Zero_Pre
+from dataloaders.cub2011 import Cub2011
 from distributions import DoubleDistribution, SemanticDistribution
 from nets import Classifier
 from permuters import LinearLU, Permuter, Reverse
 from text_encoders.context_encoder import ContextEncoder
 from transform import Flow
+import yaml
 
 CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
 os.environ['WANDB_MODE'] = 'online'
-os.environ['WANDB_NAME'] = 'INN'
-save = False
+os.environ['WANDB_NAME'] = 'generated_seen_INN'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_inference_CUB', entity='mvalente',
-                 config=r'config/finetune_conf.yaml')
+                 config=r'config/classifier.yaml')
 
-wandb.config['checkpoint'] = 'gallant-sponge-13-20.pth'
+wandb.config['checkpoint'] = 'splendid-bird-38-20.pth'
+wandb.config['text_order'] = True
+wandb.config['visual_order'] = True
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
 
+wandb.config.update(state['config'])
+with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
+    wandb.config.update(yaml.safe_load(d))
+    wandb.config.update(yaml.safe_load(c), allow_val_change=True)
+
 config = wandb.config
 generator_config = state['config']
-wandb.config['text_encoder'] = generator_config['text_encoder']
-wandb.config['image_encoder'] = generator_config['image_encoder']
 
 normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
                                      std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
@@ -53,17 +58,18 @@ transforms_cub = transforms.Compose([
     VisualExtractor(generator_config['image_encoder'])
 ])
 
-cub = Cub2011Zero_Pre(root='/project/data/', test=config['test'], split=config['split'], config=config, transform=transforms_cub)
+cub = Cub2011(root='/project/data/', zero_shot=True, config=config, transform=None)
 generation_ids = cub.generation_ids
 imgs_per_class = cub.imgs_per_class
 
-context_encoder = ContextEncoder(generator_config, generation_ids=generation_ids, device=device, generation=True)
-contexts = context_encoder.contexts.to(device)
+context_encoder = ContextEncoder(config, device=device)
+contexts = context_encoder.contexts.to(device)[generation_ids]
 
 input_dim = 2048  # cub[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
+semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device))
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 
 if generator_config['permuter'] == 'random':
@@ -104,10 +110,16 @@ generated_features = []
 labels = []
 with torch.no_grad():
     for idx, class_id in enumerate(tqdm.tqdm(generation_ids, desc='Generating Features')):
-        number_samples = imgs_per_class[class_id]
-        generated_features.append(generator.generation(
-            torch.hstack((contexts[idx].repeat(number_samples).reshape(-1, context_dim),
-                          visual_distribution.sample([number_samples])))))
+        num_samples = imgs_per_class[class_id]
+        if config['context_sampling']:
+            s = semantic_distribution.sample(num_samples=num_samples, n_points=1, context=idx).reshape(num_samples, -1)
+            v = visual_distribution.sample([num_samples])
+            prime_generation = torch.cat((s, v), axis=1)
+            generated_features.append(generator.generation(prime_generation))
+        else:
+            generated_features.append(generator.generation(
+                torch.hstack((contexts[idx].repeat(num_samples).reshape(-1, context_dim),
+                              visual_distribution.sample([num_samples])))))
 
 generated_features = torch.cat(generated_features, dim=0).to('cpu')
 
@@ -120,23 +132,27 @@ try:  # Deletes genererator model since its not used anymore
 except Exception:
     print("Failed to delete generator or clear CUDA cache memory")
 
-train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
+train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size_c'], shuffle=True, pin_memory=True)
 val_loader = torch.utils.data.DataLoader(cub, batch_size=1000, shuffle=True, pin_memory=True)
 
-model = Classifier(input_dim, config['num_classes'])
+model = Classifier(input_dim, len(generation_ids))  # len of gen_ids corresponds to the number of classes to classify
 model.train()
 model = model.to(device)
+
 
 print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameters()])}')
 run.watch(model)
 
-loss_fn = nn.CrossEntropyLoss().to(device)
-optimizer = optim.Adam(model.parameters(), lr=config['lr'])
-tau = config['tau']
-tau = torch.tensor(tau).to(device)
-for epoch in range(config['epochs']):
+if config['tau']:
+    loss_fn = nn.CrossEntropyLoss(reduction='none').to(device)
+    tau = config['tau']
+    tau = torch.tensor(tau).to(device)
+else:
+    loss_fn = nn.CrossEntropyLoss().to(device)
+
+optimizer = optim.Adam(model.parameters(), lr=config['lr_c'])
+for epoch in range(config['epochs_c']):
     losses = []
-    #  for batch_idx, (input, target) in enumerate(loader):
     for data, targets, seen_or_unseen in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
@@ -146,9 +162,10 @@ for epoch in range(config['epochs']):
         output = model(data)
         loss = loss_fn(output, targets)
 
-        # cal_stacking = seen_or_unseen + 1.0
-        # cal_stacking[cal_stacking == 2] = tau
-        # loss = (loss * cal_stacking).mean()
+        if config['tau']:
+            cal_stacking = seen_or_unseen + 1.0
+            cal_stacking[cal_stacking == 2] = tau
+            loss = (loss * cal_stacking).mean()
 
         loss.backward()
         losses.append(loss.item())
@@ -158,13 +175,13 @@ for epoch in range(config['epochs']):
     if True:
         with torch.no_grad():
             correct_seen = 0
-            correct_unseen = 0
-            correct_test = 0
-            total_seen = 0
             total_unseen = 0
-            total_test = 0
-            accuracy_seen = 0
             accuracy_unseen = 0
+            correct_unseen = 0
+            total_seen = 0
+            accuracy_seen = 0
+            correct_test = 0
+            total_test = 0
             accuracy_test = 0
             harmonic_mean = 0
 
@@ -176,32 +193,97 @@ for epoch in range(config['epochs']):
                 outputs = model(images)
                 _, predicted = torch.max(outputs, 1)
 
+                if 'seen' in config['zero_test'] or 'all' in config['zero_test']:
+                    total_seen += seen_or_unseen[seen_or_unseen == 1].numel()
+                    correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
+                if 'zero' in config['zero_test'] or 'all' in config['zero_test']:
+                    total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
+                    correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
+                if 'all' in config['zero_test']:
+                    total_test += seen_or_unseen[seen_or_unseen == 2].numel()
+                    correct_test += (predicted[seen_or_unseen == 2] == labels[seen_or_unseen == 2]).sum().item()
+
+            # print(f'correct seen:{correct_seen}  correct unseen:{correct_unseen} | total s:{total_seen}  total u:{total_unseen}')
+
+            if 'seen' in config['zero_test'] or 'all' in config['zero_test']:
+                if correct_seen != 0:
+                    accuracy_seen = correct_seen / total_seen
+                wandb.log({"Acc_seen": accuracy_seen})
+
+            if 'zero' in config['zero_test'] or 'all' in config['zero_test']:
+                if correct_unseen != 0:
+                    accuracy_unseen = correct_unseen / total_unseen
+                wandb.log({"Acc_unseen": accuracy_unseen})
+
+            if 'seen' in config['zero_test'] and 'zero' in config['zero_test']:
+                if accuracy_seen != 0 and accuracy_unseen != 0:
+                    harmonic_mean = 2 / (1 / accuracy_seen + 1 / accuracy_unseen)
+                wandb.log({"Harmonic Mean": harmonic_mean})
+
+            if 'all' in config['zero_test']:
+                if correct_test != 0:
+                    accuracy_test = correct_test / total_test
+                    wandb.log({"Acc_test": accuracy_test})
+            cub.eval()  # Switch dataset return to img, target
+
+    print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')
+
+    if loss.isnan():
+        raise Exception('Nan in loss!')
+
+
+loss_fn = nn.CrossEntropyLoss().to(device)
+optimizer = optim.Adam(model.parameters(), lr=config['lr_c'])
+tau = config['tau']
+tau = torch.tensor(tau).to(device)
+for epoch in range(config['epochs_c']):
+    losses = []
+    #  for batch_idx, (input, target) in enumerate(loader):
+    for data, targets, seen_or_unseen in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
+        data = data.to(device)
+        targets = targets.to(device)
+        seen_or_unseen = seen_or_unseen.to(device)
+
+        optimizer.zero_grad()
+        output = model(data)
+        loss = loss_fn(output, targets)
+
+        loss.backward()
+        losses.append(loss.item())
+        optimizer.step()
+        wandb.log({"loss": loss.item()})
+
+    if True:
+        with torch.no_grad():
+            correct_unseen = 0
+            total_unseen = 0
+            accuracy_unseen = 0
+            correct_seen = 0
+            total_seen = 0
+            accuracy_seen = 0
+
+            cub.eval()  # Switch dataset return to img, target, seen_or_unseen
+            for data_val, target_val, seen_or_unseen in tqdm.tqdm(val_loader, desc="Validation"):
+                images = data_val.to(device)
+                labels = target_val.to(device)
+
+                outputs = model(images)
+                _, predicted = torch.max(outputs, 1)
+
                 total_seen += seen_or_unseen[seen_or_unseen == 1].numel()
-                total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
-                total_test += seen_or_unseen[seen_or_unseen == 2].numel()
+                # total_unseen += seen_or_unseen[seen_or_unseen == 0].numel()
 
+                # correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
                 correct_seen += (predicted[seen_or_unseen == 1] == labels[seen_or_unseen == 1]).sum().item()
-                correct_unseen += (predicted[seen_or_unseen == 0] == labels[seen_or_unseen == 0]).sum().item()
-                correct_test += (predicted[seen_or_unseen == 2] == labels[seen_or_unseen == 2]).sum().item()
 
-            print(f'correct seen:{correct_seen}  correct unseen:{correct_unseen} | total s:{total_seen}  total u:{total_unseen}')
+            # print(f'correct unseen:{correct_unseen} | total u:{total_unseen}')
 
             accuracy_seen = correct_seen / total_seen
-            accuracy_unseen = correct_unseen / total_unseen
-            if accuracy_seen != 0 and accuracy_unseen != 0:
-                harmonic_mean = 2 / (1 / accuracy_seen +
-                                     1 / accuracy_unseen)
+            # if correct_unseen != 0:
+                # accuracy_unseen = correct_unseen / total_unseen
 
-            if correct_test != 0:
-                accuracy_test = correct_test / total_test
-
-            wandb.log({"Acc_seen": accuracy_seen,
-                       "Acc_unseen": accuracy_unseen,
-                       "Harmonic Mean": harmonic_mean,
-                       "Epoch": epoch})
-
-            if config['test']:
-                wandb.log({"Acc_test": accuracy_test})
+            wandb.log({"Acc_seen": accuracy_seen})
+            # wandb.log({"Acc_unseen": accuracy_unseen})
 
             cub.eval()  # Switch dataset return to img, target
     print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')

@@ -20,10 +20,8 @@ class Cub2011(Dataset):
     base_folder = 'CUB_200_2011/images'
     url = 'http://www.vision.caltech.edu/visipedia-data/CUB-200-2011/CUB_200_2011.tgz'
     filename = 'CUB_200_2011.tgz'
-    tgz_md5 = '97eceeb196236b17998738112f37df78'
 
-    def __init__(self, root, zero_shot=False, which_split=None,
-                 transform=None, config=None, loader=default_loader, download=False):
+    def __init__(self, root, zero_shot=False, which_split=None, transform=None, config=None, loader=default_loader, download=False):
         self.root = os.path.expanduser(root)
         self.which_split = which_split
         self.transform = transform
