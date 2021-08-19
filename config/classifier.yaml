@@ -18,7 +18,7 @@ tau:
   value: False #0.5  # Number of classes in CUB2011
 randomness:
   desc: The probability of replacing visual by generated
-  value: 1000000 # Number of classes in CUB2011
+  value: 1000000 # 1/(choosen number) Number of classes in CUB2011
    
 
 

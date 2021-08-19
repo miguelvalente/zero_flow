@@ -28,10 +28,9 @@ import yaml
 CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
 os.environ['WANDB_MODE'] = 'online'
-os.environ['WANDB_NAME'] = 'generated_seen_INN'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-run = wandb.init(project='zero_inference_CUB', entity='mvalente',
+run = wandb.init(project='zero_classifier_CUB', entity='mvalente',
                  config=r'config/classifier.yaml')
 
 wandb.config['checkpoint'] = 'splendid-bird-38-20.pth'
