@@ -1,8 +1,52 @@
 import torch
 import numpy as np
-from transformers import AlbertTokenizer, AlbertModel, ProphetNetTokenizer, ProphetNetEncoder, BartForConditionalGeneration, BartTokenizer
+from transformers import (AlbertTokenizer, AlbertModel,
+                          ProphetNetTokenizer, ProphetNetEncoder,
+                          BartForConditionalGeneration, BartTokenizer,
+                          BertModel, BertTokenizer,
+                          BigBirdModel, BigBirdTokenizer)
 import utils
 from text_encoders.text_encoder_utils import split_with_overlap
+
+
+class BigBirdEncoder:
+    def __init__(self, config, device):
+        self.config = config
+        self.device = device
+
+        self.tokenizer = BigBirdTokenizer.from_pretrained('google/bigbird-roberta-base')
+        self.model = BigBirdModel.from_pretrained('google/bigbird-roberta-base', output_hidden_states=True)
+        self.model = self.model.to(self.device)
+        self.model.eval()
+
+    def __call__(self, input_texts):
+        ids = torch.LongTensor(self.tokenizer(input_texts, max_length=4096)['input_ids'])
+        ids = ids.to(self.device)
+
+        with torch.no_grad():
+            hidden_states = self.model(input_ids=ids.reshape(1, -1))[2]
+
+        sentence_embedding = torch.mean(hidden_states[-1], dim=1).squeeze()
+        return sentence_embedding
+
+class BertEncoder:
+    def __init__(self, config, device):
+        self.config = config
+        self.device = device
+
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.model = BertModel.from_pretrained('bert-base-uncased', output_hidden_states=True)
+        self.model = self.model.to(self.device)
+        self.model.eval()
+
+    def __call__(self, input_texts):
+        ids = torch.LongTensor(self.tokenizer(input_texts)['input_ids'])
+        ids = ids.to(self.device)
+
+        with torch.no_grad():
+            hidden_states = self.model(input_ids=ids.reshape(1, -1))[2]
+
+        print()
 
 # Adapted to PyTorch and to my use case from https://github.com/sebastianbujwid/zsl_text_imagenet.git
 class BaseEncoder:

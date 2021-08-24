@@ -9,7 +9,7 @@ import yaml
 from scipy.io import savemat
 from tqdm import tqdm
 
-from text_encoders.text_encoder import AlbertEncoder, BartEncoder, ProphetNet
+from text_encoders.text_encoder import AlbertEncoder, BartEncoder, ProphetNet, BertEncoder, BigBirdEncoder
 from text_encoders.word_embeddings import WordEmbeddings
 
 IDENTITY = 'Context Encoder| '
@@ -28,6 +28,10 @@ class ContextEncoder():
                 self.text_encoder = AlbertEncoder(self.config, device=self.device)
             elif self.config['text_encoder'] == 'bart':
                 self.text_encoder = BartEncoder(self.config, device=self.device)
+            elif self.config['text_encoder'] == 'bert':
+                self.text_encoder = BertEncoder(self.config, device=self.device)
+            elif self.config['text_encoder'] == 'bigbird':
+                self.text_encoder = BigBirdEncoder(self.config, device=self.device)
             elif self.config['text_encoder'] == 'glove':
                 self.text_encoder = WordEmbeddings(self.config, device=self.device)
             else:
@@ -50,8 +54,8 @@ class ContextEncoder():
         else:
             raw_features = scipy.io.loadmat(mat_file)
 
-            # self.contexts = torch.from_numpy(raw_features['features']).type(torch.float32)
-            self.contexts = torch.from_numpy(raw_features['att']).type(torch.float32)
+            self.contexts = torch.from_numpy(raw_features['features']).type(torch.float32)
+            # self.contexts = torch.from_numpy(raw_features['att']).type(torch.float32)
             self.contexts = 1 * ((self.contexts - self.contexts.min(axis=0).values) /
                                  (self.contexts.max(axis=0).values - self.contexts.min(axis=0).values))
 
@@ -74,11 +78,15 @@ class ContextEncoder():
             self._load_features(save_path)
         else:
             semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
-            self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)).type(torch.float32) for article in semantic]
+
+            # self.text_encoder('some text')
+            self.contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
+
+            # self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)).type(torch.float32) for article in semantic]
             self.contexts = torch.stack(self.contexts)
 
             if self.config['save_text_features']:
-                features = [feature.numpy() for feature in self.contexts]
+                features = [feature.cpu().numpy() for feature in self.contexts]
                 mdic = {'features': features}
                 savemat(save_path, mdic)
 

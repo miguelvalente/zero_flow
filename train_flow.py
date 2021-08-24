@@ -1,28 +1,27 @@
 import os
-import torch
-import wandb
-from transform import Flow
-import tqdm
-from distributions import DoubleDistribution, SemanticDistribution
-from permuters import LinearLU, Permuter, Reverse
-import torch.nn as nn
-from affine_coupling import AffineCoupling
-import torch.optim as optim
-import torch.distributions as dist
-from act_norm import ActNormBijection
-from text_encoders.text_encoder import ProphetNet, AlbertEncoder
-from text_encoders.context_encoder import ContextEncoder
-from dataloaders.cub2011 import Cub2011
-import yaml
 
 import timm
+import torch
+import torch.distributions as dist
+import torch.nn as nn
+import torch.optim as optim
+import torchvision.datasets as datasets
+import torchvision.transforms as transforms
+import tqdm
+import yaml
 from PIL import Image
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
-from convert import VisualExtractor
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
 
+import wandb
+from act_norm import ActNormBijection
+from affine_coupling import AffineCoupling
+from convert import VisualExtractor
+from dataloaders.cub2011 import Cub2011
+from distributions import DoubleDistribution, SemanticDistribution
+from permuters import LinearLU, Permuter, Reverse
+from text_encoders.context_encoder import ContextEncoder
+from transform import Flow
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
@@ -30,7 +29,7 @@ os.environ['WANDB_MODE'] = 'online'
 save = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-run = wandb.init(project='zero_inn_CUB', entity='mvalente',
+run = wandb.init(project='zero_flow_CUB_2.0', entity='mvalente',
                  config=r'config/flow.yaml')
 
 with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
@@ -39,7 +38,13 @@ with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml
 
 config = wandb.config
 
-cub_train = Cub2011(config=config, which_split='train', root='/project/data/')
+transforms_cub = None
+# if config['image_encoder']:
+#     transforms_cub = transforms.Compose([
+#         VisualExtractor(config['image_encoder'])
+#     ])
+
+cub_train = Cub2011(config=config, which_split='train', root='/project/data/', transform=transforms_cub)
 seen_id = cub_train.seen_id
 unseen_id = cub_train.unseen_id
 
@@ -50,7 +55,7 @@ cu = contexts[unseen_id]
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-cub_val = Cub2011(config=config, which_split='test', root='/project/data/')
+cub_val = Cub2011(config=config, which_split='test', root='/project/data/', transform=transforms_cub)
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
 test_id = cub_val.test_id
 
@@ -58,7 +63,6 @@ input_dim = cub_train[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
-# semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device), (context_dim, 1))
 semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device))
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 base_dist = DoubleDistribution(visual_distribution, semantic_distribution, input_dim, context_dim)

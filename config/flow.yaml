@@ -30,7 +30,7 @@ net:
   value: MLP #MLPR # MLP
 non_linearity:
   desc: non linear function for Affine Coupling
-  value: prelu # relu leakyrelu
+  value: leakyrelu #prelu # relu leakyrelu
 minmax_rescale:
   desc: presence of actnorm
   value: True
@@ -39,7 +39,7 @@ act_norm:
   value: True
 dataset:
   desc: which dataset to use
-  value: manual_cub2011 #imagenet
+  value: cub2011 #manual_cub2011 #imagenet
 glove_dir:
   desc: directory for glove
   value: /project/data/glove.840B.300d.txt # /project/data/image_net/train

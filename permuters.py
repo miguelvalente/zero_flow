@@ -58,18 +58,6 @@ class Shuffle(Permuter):
     def __init__(self, dim_size, dim=1):
         super(Shuffle, self).__init__(torch.randperm(dim_size), dim)
 
-class Reverse(Permuter):
-    """
-    Reverses inputs on a given dimension.
-    Args:
-        dim_size: int, number of elements on dimension dim
-        dim: int, dimension to permute (excluding batch_dimension)
-    """
-
-    def __init__(self, dim_size, dim=1):
-        super(Reverse, self).__init__(torch.arange(dim_size - 1, -1, -1), dim)
-
-
 class LinearLU(Transform):
     """
     Linear bijection where the LU decomposition of the weights are parameterized.

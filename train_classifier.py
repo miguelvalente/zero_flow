@@ -9,6 +9,7 @@ import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 import tqdm
+import yaml
 from PIL import Image
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
@@ -23,9 +24,8 @@ from nets import Classifier
 from permuters import LinearLU, Permuter, Reverse
 from text_encoders.context_encoder import ContextEncoder
 from transform import Flow
-import yaml
 
-CUDA_LAUNCH_BLOCKING = 1
+# CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
 os.environ['WANDB_MODE'] = 'online'
 
@@ -33,7 +33,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_classifier_CUB', entity='mvalente',
                  config=r'config/classifier.yaml')
 
-wandb.config['checkpoint'] = 'splendid-bird-38-20.pth'
+wandb.config['checkpoint'] = 'major-dawn-57-20.pth'
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
@@ -44,18 +44,14 @@ with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml
     wandb.config.update(yaml.safe_load(c), allow_val_change=True)
 
 config = wandb.config
-generator_config = state['config']
 
-normalize_cub = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
-                                     std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
-# normalize_imagenet = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-#                                           std=[0.229, 0.224, 0.225])
+transforms_cub = None
+# if config['image_encoder']:
+#     transforms_cub = transforms.Compose([
+#         VisualExtractor(config['image_encoder'])
+#     ])
 
-transforms_cub = transforms.Compose([
-    VisualExtractor(generator_config['image_encoder'])
-])
-
-cub = Cub2011(root='/project/data/', zero_shot=True, config=config, transform=None)
+cub = Cub2011(root='/project/data/', zero_shot=True, config=config, transform=transforms_cub)
 generation_ids = cub.generation_ids
 imgs_per_class = cub.imgs_per_class
 
@@ -69,36 +65,36 @@ split_dim = input_dim - context_dim
 semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device))
 visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
 
-if generator_config['permuter'] == 'random':
+if config['permuter'] == 'random':
     permuter = lambda dim: Permuter(permutation=torch.randperm(dim, dtype=torch.long).to(device))
-elif generator_config['permuter'] == 'reverse':
+elif config['permuter'] == 'reverse':
     permuter = lambda dim: Reverse(dim_size=dim)
-elif generator_config['permuter'] == 'LinearLU':
+elif config['permuter'] == 'LinearLU':
     permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
 
-if generator_config['non_linearity'] == 'relu':
+if config['non_linearity'] == 'relu':
     non_linearity = torch.nn.ReLU()
-elif generator_config['non_linearity'] == 'prelu':
+elif config['non_linearity'] == 'prelu':
     non_linearity = nn.PReLU(init=0.01)
-elif generator_config['non_linearity'] == 'leakyrelu':
+elif config['non_linearity'] == 'leakyrelu':
     non_linearity = nn.LeakyReLU()
 
-if not generator_config['hidden_dims']:
+if not config['hidden_dims']:
     hidden_dims = [input_dim // 2]
 else:
-    hidden_dims = generator_config['hidden_dims']
+    hidden_dims = config['hidden_dims']
 
-transforms = []
-for index in range(generator_config['block_size']):
-    if generator_config['act_norm']:
-        transforms.append(ActNormBijection(input_dim, data_dep_init=True))
-    transforms.append(permuter(input_dim))
-    transforms.append(AffineCoupling(
+transform = []
+for index in range(config['block_size']):
+    if config['act_norm']:
+        transform.append(ActNormBijection(input_dim, data_dep_init=True))
+    transform.append(permuter(input_dim))
+    transform.append(AffineCoupling(
         input_dim,
         split_dim,
-        context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=generator_config['net']))
+        context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=config['net']))
 
-generator = Flow(transforms)  # No base distribution needs to be passed since we only want generation
+generator = Flow(transform)  # No base distribution needs to be passed since we only want generation
 generator.load_state_dict(state['state_dict'])
 generator = generator.to(device)
 generator.eval()
