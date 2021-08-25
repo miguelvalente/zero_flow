@@ -9,7 +9,9 @@ import yaml
 from scipy.io import savemat
 from tqdm import tqdm
 
-from text_encoders.text_encoder import AlbertEncoder, BartEncoder, ProphetNet, BertEncoder, BigBirdEncoder
+from text_encoders.text_encoder import (AlbertEncoder, BartEncoder,
+                                        BertEncoder, BigBirdEncoder,
+                                        ProphetNet)
 from text_encoders.word_embeddings import WordEmbeddings
 
 IDENTITY = 'Context Encoder| '
@@ -54,8 +56,8 @@ class ContextEncoder():
         else:
             raw_features = scipy.io.loadmat(mat_file)
 
-            self.contexts = torch.from_numpy(raw_features['features']).type(torch.float32)
-            # self.contexts = torch.from_numpy(raw_features['att']).type(torch.float32)
+            # self.contexts = torch.from_numpy(raw_features['features']).type(torch.float32)
+            self.contexts = torch.from_numpy(raw_features['att']).type(torch.float32)
             self.contexts = 1 * ((self.contexts - self.contexts.min(axis=0).values) /
                                  (self.contexts.max(axis=0).values - self.contexts.min(axis=0).values))
 

@@ -11,6 +11,7 @@ import torchvision.transforms as transforms
 import tqdm
 import yaml
 from PIL import Image
+from sklearn.metrics.pairwise import cosine_similarity
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 
@@ -20,7 +21,7 @@ from affine_coupling import AffineCoupling
 from convert import VisualExtractor
 from dataloaders.cub2011 import Cub2011
 from distributions import DoubleDistribution, SemanticDistribution
-from nets import Classifier
+from nets import Classifier, GSModule
 from permuters import LinearLU, Permuter, Reverse
 from text_encoders.context_encoder import ContextEncoder
 from transform import Flow
@@ -33,7 +34,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_classifier_CUB', entity='mvalente',
                  config=r'config/classifier.yaml')
 
-wandb.config['checkpoint'] = 'major-dawn-57-20.pth'
+wandb.config['checkpoint'] = 'zany-jazz-61-20.pth'
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
@@ -56,7 +57,23 @@ generation_ids = cub.generation_ids
 imgs_per_class = cub.imgs_per_class
 
 context_encoder = ContextEncoder(config, device=device)
-contexts = context_encoder.contexts.to(device)[generation_ids]
+contexts = context_encoder.contexts.to(device)
+
+if config['relative_positioning']:
+    contexts_copy = contexts.clone().detach().cpu().numpy()
+    sim = cosine_similarity(contexts_copy, contexts_copy)
+    min_idx = np.argmin(sim.sum(-1))
+    minimum = contexts_copy[min_idx]
+    max_idx = np.argmax(sim.sum(-1))
+    maximum = contexts_copy[max_idx]
+    medi_idx = np.argwhere(sim.sum(-1) == np.sort(sim.sum(-1))[int(sim.shape[0] / 2)])
+    medi = contexts_copy[int(medi_idx)]
+    vertices = torch.from_numpy(np.stack((minimum, maximum, medi))).float().cuda()
+    sm = GSModule(vertices, 1024).cuda()
+    sm.load_state_dict(state['state_dict_sm'])
+    contexts = sm(contexts)[generation_ids]
+else:
+    contexts = contexts[generation_ids]
 
 input_dim = 2048  # cub[0][0].shape.numel()
 context_dim = contexts[0].shape.numel()
@@ -95,7 +112,7 @@ for index in range(config['block_size']):
         context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net=config['net']))
 
 generator = Flow(transform)  # No base distribution needs to be passed since we only want generation
-generator.load_state_dict(state['state_dict'])
+generator.load_state_dict(state['state_dict_flow'])
 generator = generator.to(device)
 generator.eval()
 

@@ -37,6 +37,9 @@ minmax_rescale:
 act_norm:
   desc: presence of actnorm
   value: True
+relative_positioning: 
+  desc: relative positioning while training
+  value: True
 dataset:
   desc: which dataset to use
   value: cub2011 #manual_cub2011 #imagenet

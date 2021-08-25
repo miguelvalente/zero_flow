@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import timm
 import torch
 import torch.distributions as dist
@@ -10,6 +11,7 @@ import torchvision.transforms as transforms
 import tqdm
 import yaml
 from PIL import Image
+from sklearn.metrics.pairwise import cosine_similarity
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 
@@ -19,6 +21,7 @@ from affine_coupling import AffineCoupling
 from convert import VisualExtractor
 from dataloaders.cub2011 import Cub2011
 from distributions import DoubleDistribution, SemanticDistribution
+from nets import GSModule
 from permuters import LinearLU, Permuter, Reverse
 from text_encoders.context_encoder import ContextEncoder
 from transform import Flow
@@ -60,7 +63,7 @@ val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True,
 test_id = cub_val.test_id
 
 input_dim = cub_train[0][0].shape.numel()
-context_dim = contexts[0].shape.numel()
+context_dim = 1024  # contexts[0].shape.numel()
 split_dim = input_dim - context_dim
 
 semantic_distribution = SemanticDistribution(contexts, torch.ones(context_dim).to(device))
@@ -102,26 +105,50 @@ model = Flow(transform, base_dist)
 model.train()
 model = model.to(device)
 
-print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameters()])}')
-run.watch(model)
-optimizer = optim.Adam(model.parameters(), lr=config['lr'])
+if config['relative_positioning']:
+    contexts_copy = contexts.clone().detach().cpu().numpy()
+    sim = cosine_similarity(contexts_copy, contexts_copy)
+    min_idx = np.argmin(sim.sum(-1))
+    minimum = contexts_copy[min_idx]
+    max_idx = np.argmax(sim.sum(-1))
+    maximum = contexts_copy[max_idx]
+    medi_idx = np.argwhere(sim.sum(-1) == np.sort(sim.sum(-1))[int(sim.shape[0] / 2)])
+    medi = contexts_copy[int(medi_idx)]
+    vertices = torch.from_numpy(np.stack((minimum, maximum, medi))).float().cuda()
+    sm = GSModule(vertices, 1024).cuda()
+    parameters = list(model.parameters()) + list(sm.parameters())
+else:
+    parameters = model.parameters()
+
+print(f'Number of trainable parameters: {sum([x.numel() for x in parameters])}')
+# run.watch(model)
+optimizer = optim.Adam(parameters, lr=config['lr'])
 
 for epoch in range(1, config['epochs']):
     losses = []
     for data, targets, _ in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
-
         optimizer.zero_grad()
-        # loss_flow, lg, ldj = - model.log_prob(data, targets).mean() * config['wt_f_l']
-        log_prob, lg, ldj = model.log_prob(data, targets)
+
+        if config['relative_positioning']:
+            relative_contexts = torch.stack([contexts[i, :] for i in targets])
+            relative_contexts = sm(relative_contexts)
+            cs_relative = sm(cs)
+            cu_relative = sm(cu)
+            log_prob, lg, ldj = model.log_prob(data, relative_contexts)
+            centralizing_loss = model.centralizing_loss(data, targets, cs_relative, seen_id) * config['wt_c_l']
+        else:
+            log_prob, lg, ldj = model.log_prob(data, targets)
+            centralizing_loss = model.centralizing_loss(data, targets, cs, seen_id) * config['wt_c_l']
+
         ldj = ldj.mean()
         lg = lg.mean()
 
+        # Flow losses
         loss_flow = - log_prob.mean() * config['wt_f_l']
-        centralizing_loss = model.centralizing_loss(data, targets, cs, seen_id) * config['wt_c_l']
-        mmd_loss = model.mmd_loss(data, cu) * config['wt_mmd_l']
-        loss = loss_flow + centralizing_loss + mmd_loss
+        # mmd_loss = model.mmd_loss(data, cu) * config['wt_mmd_l']
+        loss = loss_flow + centralizing_loss  # + mmd_loss
         loss.backward()
 
         nn.utils.clip_grad_value_(model.parameters(), 1.0)
@@ -136,7 +163,7 @@ for epoch in range(1, config['epochs']):
         run.log({"loss": loss.item(),
                  "loss_flow": loss_flow.item(),
                  "loss_central": centralizing_loss.item(),
-                 "loss_mmd": mmd_loss.item(),
+                #  "loss_mmd": mmd_loss.item(),
                  "ldj": ldj.item(),
                  "lg": lg.item()})
 
@@ -151,11 +178,21 @@ for epoch in range(1, config['epochs']):
                 data_val = data_val.to(device)
                 targets_val = targets_val.to(device)
 
-                log_prob, _, _ = model.log_prob(data, targets)
+                if config['relative_positioning']:
+                    relative_contexts = torch.stack([contexts[i, :] for i in targets])
+                    relative_contexts = sm(relative_contexts)
+                    cs_relative = sm(cs)
+                    cu_relative = sm(cu)
+                    log_prob, _, _ = model.log_prob(data, relative_contexts)
+                    centralizing_loss_val = model.centralizing_loss(data, targets, cs_relative, seen_id) * config['wt_c_l']
+                else:
+                    log_prob, _, _ = model.log_prob(data, targets)
+                    centralizing_loss_val = model.centralizing_loss(data, targets, cs, seen_id) * config['wt_c_l']
+
                 loss_flow_val = - log_prob.mean() * config['wt_f_l']
                 centralizing_loss_val = model.centralizing_loss(data_val, targets_val, cs, test_id) * config['wt_c_l']
-                mmd_loss_val = model.mmd_loss(data_val, cu) * config['wt_mmd_l']
-                loss_val = loss_flow + centralizing_loss + mmd_loss
+                # mmd_loss_val = model.mmd_loss(data_val, cu) * config['wt_mmd_l']
+                loss_val = loss_flow + centralizing_loss  # + mmd_loss
                 losses_val.append(loss_val.item())
 
         run.log({"loss_val": sum(losses_val) / len(losses_val)})
@@ -165,7 +202,8 @@ for epoch in range(1, config['epochs']):
     if epoch % 20 == 0:
         state = {'config': config.as_dict(),
                  'split': config['split'],
-                 'state_dict': model.state_dict()}
+                 'state_dict_flow': model.state_dict(),
+                 'state_dict_sm': sm.state_dict()}
 
         torch.save(state, f'{SAVE_PATH}{wandb.run.name}-{epoch}.pth')
 

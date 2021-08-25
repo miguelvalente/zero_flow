@@ -92,7 +92,6 @@ class Flow(Transform):
         Centralizing loss
         """
         padding = data.shape[1] - cs.shape[1]
-        centralizing_loss = 0.0
         means = torch.stack([data[targets == t].mean(axis=0) for t in targets.unique()])
 
         idxs = [np.where(seen_id == target)[0][0] for target in np.asarray(targets.unique().to("cpu").detach())]

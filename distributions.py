@@ -217,7 +217,11 @@ class SemanticDistribution(Distribution):
         self.register_buffer('scale', scale)
 
     def log_prob(self, x, context=None):
-        x = (x - self.locs[context]) / self.scale
+        if len(context.shape) > 1:
+            x = (x - context) / self.scale
+        else:
+            x = (x - self.locs[context]) / self.scale
+
         return self.std_normal.log_prob(x, context=None).sum(axis=1)
 
     def sample(self, num_samples, context=None, n_points=None):

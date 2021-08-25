@@ -61,3 +61,30 @@ class Classifier(nn.Module):
     def forward(self, input_data):
         output = self.classifier(input_data)
         return output
+
+class GSModule(nn.Module):
+    def __init__(self, vertices, out_dim):
+        super(GSModule, self).__init__()
+        self.individuals = nn.ModuleList()
+        assert vertices.dim() == 2, 'invalid shape : {:}'.format(vertices.shape)
+        self.out_dim = out_dim
+        self.require_adj = False
+        for i in range(vertices.shape[0]):
+            layer = LinearModule(vertices[i], out_dim)
+            self.individuals.append(layer)
+
+    def forward(self, semantic_vec):
+        responses = [indiv(semantic_vec) for indiv in self.individuals]
+        global_semantic = sum(responses)
+        return global_semantic
+
+class LinearModule(nn.Module):
+    def __init__(self, vertice, out_dim):
+        super(LinearModule, self).__init__()
+        self.register_buffer('vertice', vertice.clone())
+        self.fc = nn.Linear(vertice.numel(), out_dim)
+
+    def forward(self, semantic_vec):
+        input_offsets = semantic_vec - self.vertice
+        response = F.relu(self.fc(input_offsets))
+        return response
