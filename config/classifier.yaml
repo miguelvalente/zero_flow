@@ -1,21 +1,21 @@
 epochs_c:
   desc: Number of epochs to train over
-  value: 50
+  value: 30
 batch_size_c:
   desc: Size of each batch
-  value: 128
+  value: 3000
 lr_c:
   desc: Learning rate
-  value: 0.001
+  value: 0.01
 zero_test:
   desc: The type of classification to be performed
-  value: seen_zero #zero #seen #_zero #all #zero seen_zero all_with_text
+  value: zero #zero #seen #_zero #all #zero seen_zero all_with_text
 context_sampling:
   desc: Use sampling of semantic distribution instead of a fixed vector 
-  value: True
+  value: True 
 tau:
   desc: weight for seen classes. lower weight means lower importance
-  value: 0.2 #0.5  # Number of classes in CUB2011
+  value: 0.4 #2 #0.5  # Number of classes in CUB2011
 randomness:
   desc: The probability of replacing visual by generated
   value: 10 # 1/(choosen number) Number of classes in CUB2011

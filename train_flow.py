@@ -1,3 +1,4 @@
+import math
 import os
 
 import numpy as np
@@ -5,6 +6,7 @@ import timm
 import torch
 import torch.distributions as dist
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
@@ -124,32 +126,45 @@ print(f'Number of trainable parameters: {sum([x.numel() for x in parameters])}')
 # run.watch(model)
 optimizer = optim.Adam(parameters, lr=config['lr'])
 
+x_mean = cub_train.visual_features.mean(axis=0).cuda()
+mse = nn.MSELoss()
+
 for epoch in range(1, config['epochs']):
     losses = []
     for data, targets, _ in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
         data = data.to(device)
         targets = targets.to(device)
-        optimizer.zero_grad()
+        model.zero_grad()
+        sm.zero_grad()
 
         if config['relative_positioning']:
             relative_contexts = torch.stack([contexts[i, :] for i in targets])
             relative_contexts = sm(relative_contexts)
             cs_relative = sm(cs)
             cu_relative = sm(cu)
-            log_prob, lg, ldj = model.log_prob(data, relative_contexts)
+            log_prob, ldj = model.log_prob(data, relative_contexts)
             centralizing_loss = model.centralizing_loss(data, targets, cs_relative, seen_id) * config['wt_c_l']
         else:
-            log_prob, lg, ldj = model.log_prob(data, targets)
+            log_prob, ldj = model.log_prob(data, targets)
             centralizing_loss = model.centralizing_loss(data, targets, cs, seen_id) * config['wt_c_l']
 
-        ldj = ldj.mean()
-        lg = lg.mean()
+        if config['loss_type'] == 'IZF':
+            log_prob += ldj
+            loss_flow = - log_prob.mean() * config['wt_f_l']
+        else:
+            loss_flow = torch.mean(log_prob**2) / 2 - torch.mean(ldj) / 2048
 
-        # Flow losses
-        loss_flow = - log_prob.mean() * config['wt_f_l']
         # mmd_loss = model.mmd_loss(data, cu) * config['wt_mmd_l']
         loss = loss_flow + centralizing_loss  # + mmd_loss
         loss.backward()
+
+        if config['wt_p_l'] > 0.0:
+            with torch.no_grad():
+                sr = sm(torch.cat((cs, cu), dim=0))
+            gens = model.generation(F.pad(sr, (0, 1024))).cuda()
+            x_ = model.generation(gens)
+            prototype_loss = config['wt_p_l'] * mse(x_, x_mean)
+            prototype_loss.backward()
 
         nn.utils.clip_grad_value_(model.parameters(), 1.0)
         optimizer.step()
@@ -162,17 +177,20 @@ for epoch in range(1, config['epochs']):
 
         run.log({"loss": loss.item(),
                  "loss_flow": loss_flow.item(),
-                 "loss_central": centralizing_loss.item(),
-                #  "loss_mmd": mmd_loss.item(),
-                 "ldj": ldj.item(),
-                 "lg": lg.item()})
+                 "loss_central": centralizing_loss.item(),  # "loss_mmd": mmd_loss.item(),
+                 "loss_proto": prototype_loss.item()})  # "loss_mmd": mmd_loss.item(),
 
-    if epoch % 2 == 0:
+    if False:
+    # if epoch % 1000 == 0:
         with torch.no_grad():
+            model.eval()
+            sm.eval()
             loss_flow_val = 0
             centralizing_loss_val = 0
             mmd_loss_val = 0
             loss_val = 0
+            prototype_loss = 0
+
             losses_val = []
             for data_val, targets_val, _ in tqdm.tqdm(val_loader, desc=f'Validation Epoch({epoch})'):
                 data_val = data_val.to(device)
@@ -183,7 +201,7 @@ for epoch in range(1, config['epochs']):
                     relative_contexts = sm(relative_contexts)
                     cs_relative = sm(cs)
                     cu_relative = sm(cu)
-                    log_prob, _, _ = model.log_prob(data, relative_contexts)
+                    log_prob, _ = model.log_prob(data, relative_contexts)
                     centralizing_loss_val = model.centralizing_loss(data, targets, cs_relative, seen_id) * config['wt_c_l']
                 else:
                     log_prob, _, _ = model.log_prob(data, targets)
@@ -196,14 +214,17 @@ for epoch in range(1, config['epochs']):
                 losses_val.append(loss_val.item())
 
         run.log({"loss_val": sum(losses_val) / len(losses_val)})
-        run.log({"epoch": epoch})
+    run.log({"epoch": epoch})
     print(f'Epoch({epoch}): loss:{sum(losses)/len(losses)}')
 
+    model.train()
+    sm.train()
     if epoch % 20 == 0:
         state = {'config': config.as_dict(),
                  'split': config['split'],
                  'state_dict_flow': model.state_dict(),
-                 'state_dict_sm': sm.state_dict()}
+                 'state_dict_sm': sm.state_dict(),
+                 'optimizer': optimizer.state_dict()}
 
         torch.save(state, f'{SAVE_PATH}{wandb.run.name}-{epoch}.pth')
 

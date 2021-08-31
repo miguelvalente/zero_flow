@@ -6,7 +6,7 @@ batch_size:
   value: 256
 lr:
   desc: Learning rate
-  value: 0.0005
+  value: 0.0003
 block_size:
   desc: Number of blocks
   value: 5
@@ -16,6 +16,9 @@ hidden_dims:
 permuter:
   desc: type of permutation
   value: LinearLU # manual reverse random manual
+loss_type:
+  desc: flow loss from IZF or GSMFlow
+  value: IZF
 wt_f_l:
   desc: weight for the flow loss
   value: 2
@@ -25,6 +28,9 @@ wt_c_l:
 wt_mmd_l:
   desc: weight for the mmd loss
   value: 0.1
+wt_p_l: 
+  desc: weigth of prototype loss 
+  value: 3
 net:
   desc: type olf MLP
   value: MLP #MLPR # MLP
@@ -40,18 +46,9 @@ act_norm:
 relative_positioning: 
   desc: relative positioning while training
   value: True
-dataset:
-  desc: which dataset to use
-  value: cub2011 #manual_cub2011 #imagenet
-glove_dir:
-  desc: directory for glove
-  value: /project/data/glove.840B.300d.txt # /project/data/image_net/train
 model_name:
   desc: model name of text encoder
   value: albert-base-v2 # albert-xxlarge-v2
-image_encoder:
-  desc: pretrained weights
-  value: resnet50d # efficientnet_b2
 summary_extraction_mode:
   desc: type of extraction mode
   value: mean_tokens
@@ -67,9 +64,5 @@ overlap_window:
 max_length:
   desc: max length
   value: 20
-split:
-  desc: what split is being used
-  value: proposed_split1.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
-
 
    

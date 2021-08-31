@@ -25,6 +25,13 @@ from nets import Classifier, GSModule
 from permuters import LinearLU, Permuter, Reverse
 from text_encoders.context_encoder import ContextEncoder
 from transform import Flow
+import torch.nn.init as init
+
+def weights_init(m):
+    classname = m.__class__.__name__
+    if 'Linear' in classname:
+        init.xavier_normal_(m.weight.data)
+        init.constant_(m.bias, 0.0)
 
 # CUDA_LAUNCH_BLOCKING = 1
 SAVE_PATH = 'checkpoints/'
@@ -34,7 +41,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_classifier_CUB', entity='mvalente',
                  config=r'config/classifier.yaml')
 
-wandb.config['checkpoint'] = 'zany-jazz-61-20.pth'
+wandb.config['checkpoint'] = 'stilted-dream-88-20.pth'
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
@@ -146,21 +153,24 @@ train_loader = torch.utils.data.DataLoader(cub, batch_size=config['batch_size_c'
 val_loader = torch.utils.data.DataLoader(cub, batch_size=1000, shuffle=True, pin_memory=True)
 
 model = Classifier(input_dim, len(generation_ids))  # len of gen_ids corresponds to the number of classes to classify
-model.train()
+model.apply(weights_init)
 model = model.to(device)
+model.train()
 
 
 print(f'Number of trainable parameters: {sum([x.numel() for x in model.parameters()])}')
 run.watch(model)
 
 if config['tau']:
-    loss_fn = nn.CrossEntropyLoss(reduction='none').to(device)
+    loss_fn = nn.NLLLoss(reduction='none').to(device)
+    # loss_fn = nn.CrossEntropyLoss(reduction='none').to(device)
     tau = config['tau']
     tau = torch.tensor(tau).to(device)
 else:
-    loss_fn = nn.CrossEntropyLoss().to(device)
+    # loss_fn = nn.CrossEntropyLoss().to(device)
+    loss_fn = nn.NLLLoss().to(device)
 
-optimizer = optim.Adam(model.parameters(), lr=config['lr_c'])
+optimizer = optim.Adam(model.parameters(), lr=config['lr_c'], betas=(0.5, 0.999))
 for epoch in range(config['epochs_c']):
     losses = []
     for data, targets, seen_or_unseen in tqdm.tqdm(train_loader, desc=f'Epoch({epoch})'):
@@ -178,11 +188,12 @@ for epoch in range(config['epochs_c']):
             loss = (loss * cal_stacking).mean()
 
         loss.backward()
-        losses.append(loss.item())
         optimizer.step()
+        losses.append(loss.item())
         wandb.log({"loss": loss.item()})
 
     if True:
+        model.eval()
         with torch.no_grad():
             correct_seen = 0
             total_unseen = 0
@@ -237,6 +248,6 @@ for epoch in range(config['epochs_c']):
             cub.eval()  # Switch dataset return to img, target
 
     print(f'real: {len(cub.test_real)} | gen: {len(cub.test_gen)}')
-
+    model.train()
     if loss.isnan():
         raise Exception('Nan in loss!')

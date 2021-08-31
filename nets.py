@@ -50,17 +50,28 @@ class MLPR(nn.Module):
         return x
 
 class Classifier(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dims=False):
-        super().__init__()
+    def __init__(self, input_dim, nclass):
+        super(Classifier, self).__init__()
+        self.fc = nn.Linear(input_dim, nclass)
+        self.logic = nn.LogSoftmax(dim=1)
 
-        if hidden_dims:
-            raise NotImplementedError
-        else:
-            self.classifier = nn.Linear(input_dim, output_dim)
-
-    def forward(self, input_data):
-        output = self.classifier(input_data)
+    def forward(self, x):
+        output = self.logic(self.fc(x))
         return output
+
+
+# class Classifier(nn.Module):
+#     def __init__(self, input_dim, output_dim, hidden_dims=False):
+#         super().__init__()
+
+#         if hidden_dims:
+#             raise NotImplementedError
+#         else:
+#             self.classifier = nn.Linear(input_dim, output_dim)
+
+#     def forward(self, input_data):
+#         output = self.classifier(input_data)
+#         return output
 
 class GSModule(nn.Module):
     def __init__(self, vertices, out_dim):

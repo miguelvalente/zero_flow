@@ -60,21 +60,17 @@ class Flow(Transform):
         self.transforms = nn.ModuleList(transform_list)
 
     def log_prob(self, x, context=None):
+        log_prob_ldj = torch.zeros(x.shape[:-1], device=x.device, dtype=x.dtype)
         log_prob = torch.zeros(x.shape[:-1], device=x.device, dtype=x.dtype)
-        log_prob_temp = torch.zeros(x.shape[:-1], device=x.device, dtype=x.dtype)
         for index, transform in enumerate(self.transforms):
             x, ldj = transform(x, context=None)
-            log_prob += ldj
+            log_prob_ldj += ldj
             if x.isnan().any() or x.isinf().any():
                 Exception("Nan or Inf")
 
-        # log_prob += self.base_dist.log_prob(x, context=context)
-        with torch.no_grad():
-            ldj = log_prob.clone()
-            log_prob_temp = self.base_dist.log_prob(x, context=context)
-        log_prob += self.base_dist.log_prob(x, context=context)
+        log_prob = self.base_dist.log_prob(x, context=context)
 
-        return log_prob, log_prob_temp, ldj
+        return log_prob, log_prob_ldj
 
     def generation(self, z):
         for transform in reversed(self.transforms):
