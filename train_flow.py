@@ -24,6 +24,7 @@ from convert import VisualExtractor
 from dataloaders.cub2011 import Cub2011
 from distributions import DoubleDistribution, SemanticDistribution
 from nets import GSModule
+
 from permuters import LinearLU, Permuter, Reverse
 from text_encoders.context_encoder import ContextEncoder
 from transform import Flow
@@ -60,7 +61,7 @@ cu = contexts[unseen_id]
 
 train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 
-cub_val = Cub2011(config=config, which_split='test', root='/project/data/', transform=transforms_cub)
+cub_val = Cub2011(config=config, which_split='val', root='/project/data/', transform=transforms_cub)
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
 test_id = cub_val.test_id
 
@@ -120,7 +121,7 @@ if config['relative_positioning']:
     sm = GSModule(vertices, 1024).cuda()
     parameters = list(model.parameters()) + list(sm.parameters())
 else:
-    parameters = model.parameters()
+    parameters = list(model.parameters())
 
 print(f'Number of trainable parameters: {sum([x.numel() for x in parameters])}')
 # run.watch(model)
@@ -135,18 +136,20 @@ for epoch in range(1, config['epochs']):
         data = data.to(device)
         targets = targets.to(device)
         model.zero_grad()
-        sm.zero_grad()
 
         if config['relative_positioning']:
+            sm.zero_grad()
             relative_contexts = torch.stack([contexts[i, :] for i in targets])
             relative_contexts = sm(relative_contexts)
             cs_relative = sm(cs)
             cu_relative = sm(cu)
             log_prob, ldj = model.log_prob(data, relative_contexts)
             centralizing_loss = model.centralizing_loss(data, targets, cs_relative, seen_id) * config['wt_c_l']
+            mmd_loss = model.mmd_loss(data, cu_relative) * config['wt_mmd_l']
         else:
             log_prob, ldj = model.log_prob(data, targets)
             centralizing_loss = model.centralizing_loss(data, targets, cs, seen_id) * config['wt_c_l']
+            mmd_loss = model.mmd_loss(data, cu) * config['wt_mmd_l']
 
         if config['loss_type'] == 'IZF':
             log_prob += ldj
@@ -154,8 +157,7 @@ for epoch in range(1, config['epochs']):
         else:
             loss_flow = torch.mean(log_prob**2) / 2 - torch.mean(ldj) / 2048
 
-        # mmd_loss = model.mmd_loss(data, cu) * config['wt_mmd_l']
-        loss = loss_flow + centralizing_loss  # + mmd_loss
+        loss = loss_flow + centralizing_loss + mmd_loss
         loss.backward()
 
         if config['wt_p_l'] > 0.0:
@@ -166,7 +168,7 @@ for epoch in range(1, config['epochs']):
             prototype_loss = config['wt_p_l'] * mse(x_, x_mean)
             prototype_loss.backward()
 
-        nn.utils.clip_grad_value_(model.parameters(), 1.0)
+        # nn.utils.clip_grad_value_(model.parameters(), 1.0)
         optimizer.step()
 
         if loss.isnan():
@@ -177,11 +179,10 @@ for epoch in range(1, config['epochs']):
 
         run.log({"loss": loss.item(),
                  "loss_flow": loss_flow.item(),
-                 "loss_central": centralizing_loss.item(),  # "loss_mmd": mmd_loss.item(),
-                 "loss_proto": prototype_loss.item()})  # "loss_mmd": mmd_loss.item(),
+                 "loss_central": centralizing_loss.item(),
+                 "loss_mmd": mmd_loss.item()})  # "loss_proto": prototype_loss.item()})  # "loss_mmd": mmd_loss.item(),
 
     if False:
-    # if epoch % 1000 == 0:
         with torch.no_grad():
             model.eval()
             sm.eval()

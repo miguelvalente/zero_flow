@@ -12,7 +12,7 @@ block_size:
   value: 5
 hidden_dims:
   desc: Number of hidden dims and their dimensions
-  value: [1024]
+  value: [2048]
 permuter:
   desc: type of permutation
   value: LinearLU # manual reverse random manual
@@ -30,7 +30,7 @@ wt_mmd_l:
   value: 0.1
 wt_p_l: 
   desc: weigth of prototype loss 
-  value: 3
+  value: 0
 net:
   desc: type olf MLP
   value: MLP #MLPR # MLP
@@ -38,7 +38,7 @@ non_linearity:
   desc: non linear function for Affine Coupling
   value: leakyrelu #prelu # relu leakyrelu
 minmax_rescale:
-  desc: presence of actnorm
+  desc: rescaling
   value: True
 act_norm:
   desc: presence of actnorm

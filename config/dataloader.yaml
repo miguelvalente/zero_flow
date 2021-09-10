@@ -2,5 +2,5 @@ save_visual_features: 'data/CUB_200_2011/mat/visual/'
 load_precomputed_visual: True
 mat_file_visual: 'data/CUB_200_2011/mat/visual/resnet50d.mat'
 # mat_file_visual: 'data/CUB_200_2011/mat/visual/res101_ordered.mat'
-split: proposed_split3.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
+split: easy_split.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
 image_encoder: resnet50d # efficientnet_b2

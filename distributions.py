@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import math
-from utils import sum_except_batch, mean_except_batch
+from myutils import sum_except_batch, mean_except_batch
 from torch.distributions import Distribution as TorchDistribution
 
 class Distribution(nn.Module):
@@ -190,7 +190,6 @@ class StandardNormal(Distribution):
         return torch.randn(num_samples, *sample_shape, device=self.buffer.device, dtype=self.buffer.dtype)
 
 class Normal(Distribution):
-
     def __init__(self, loc, scale, shape):
         super().__init__()
         self.std_normal = StandardNormal(shape)
