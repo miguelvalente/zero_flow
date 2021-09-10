@@ -93,10 +93,9 @@ def synthesize_feature(flow, sm, dataset, opt):
             # z = z*z.norm(dim=-1, keepdim=True)
             G_sample = flow.generation(torch.cat((sr, z), dim=1))
             # G_sample = flow.reverse_sample(z, sr)
-            gen_feat[i*opt.nSample:(i+1)*opt.nSample] = G_sample
-            gen_label = np.hstack((gen_label, np.ones([opt.nSample])*i))
+            gen_feat[i * opt.nSample:(i + 1) * opt.nSample] = G_sample
+            gen_label = np.hstack((gen_label, np.ones([opt.nSample]) * i))
     return gen_feat, torch.from_numpy(gen_label.astype(int))
-
 
 
 def save_model(it, flow, gs, random_seed, log, fout):

@@ -63,7 +63,6 @@ train_loader = torch.utils.data.DataLoader(cub_train, batch_size=config['batch_s
 
 cub_val = Cub2011(config=config, which_split='val', root='/project/data/', transform=transforms_cub)
 val_loader = torch.utils.data.DataLoader(cub_val, batch_size=1000, shuffle=True, pin_memory=True)
-test_id = cub_val.test_id
 
 input_dim = cub_train[0][0].shape.numel()
 context_dim = 1024  # contexts[0].shape.numel()

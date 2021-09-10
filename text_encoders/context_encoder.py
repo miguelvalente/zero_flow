@@ -21,48 +21,29 @@ class ContextEncoder():
         self.config = config
         self.device = device
 
-        if self.config['load_precomputed_text']:
-            self._load_features(self.config['mat_file_text'])
+        if self.config['text_encoder'] == 'prophet_net':
+            self.text_encoder = ProphetNet(self.config, device=self.device)
+        elif self.config['text_encoder'] == 'albert':
+            self.text_encoder = AlbertEncoder(self.config, device=self.device)
+        elif self.config['text_encoder'] == 'bart':
+            self.text_encoder = BartEncoder(self.config, device=self.device)
+        elif self.config['text_encoder'] == 'bert':
+            self.text_encoder = BertEncoder(self.config, device=self.device)
+        elif self.config['text_encoder'] == 'bigbird':
+            self.text_encoder = BigBirdEncoder(self.config, device=self.device)
+        elif self.config['text_encoder'] == 'glove':
+            self.text_encoder = WordEmbeddings(self.config, device=self.device)
         else:
-            if self.config['text_encoder'] == 'prophet_net':
-                self.text_encoder = ProphetNet(self.config, device=self.device)
-            elif self.config['text_encoder'] == 'albert':
-                self.text_encoder = AlbertEncoder(self.config, device=self.device)
-            elif self.config['text_encoder'] == 'bart':
-                self.text_encoder = BartEncoder(self.config, device=self.device)
-            elif self.config['text_encoder'] == 'bert':
-                self.text_encoder = BertEncoder(self.config, device=self.device)
-            elif self.config['text_encoder'] == 'bigbird':
-                self.text_encoder = BigBirdEncoder(self.config, device=self.device)
-            elif self.config['text_encoder'] == 'glove':
-                self.text_encoder = WordEmbeddings(self.config, device=self.device)
-            else:
-                print(f"{IDENTITY} Encoding setting not found")
-                raise
+            print(f"{IDENTITY} Encoding setting not found")
+            raise
 
-            if self.config['dataset'] == 'imagenet':
-                self._encode_contexts_imagenet()
-            elif self.config['dataset'] == 'cub2011':
-                self._encode_contexts_cub2011()
-            else:
-                print(f"{IDENTITY} Dataset not found")
-                raise Exception
-
-    def _load_features(self, mat_file):
-        print(f'{IDENTITY} Loading .mat file: {mat_file}')
-        if not os.path.exists(mat_file):
-            print(f'{IDENTITY} .mat does not exist. Loading not possible using _encode_contexts() instead.')
+        if self.config['dataset'] == 'imagenet':
+            self._encode_contexts_imagenet()
+        elif self.config['dataset'] == 'cub2011':
             self._encode_contexts_cub2011()
         else:
-            raw_features = scipy.io.loadmat(mat_file)
-
-            if mat_file == 'data/CUB_200_2011/mat/text/att_splits_ordered.mat':
-                self.contexts = torch.from_numpy(raw_features['att']).type(torch.float32)
-            else:
-                self.contexts = torch.from_numpy(raw_features['features']).type(torch.float32)
-
-            self.contexts = 1 * ((self.contexts - self.contexts.min(axis=0).values) /
-                                 (self.contexts.max(axis=0).values - self.contexts.min(axis=0).values))
+            print(f"{IDENTITY} Dataset not found")
+            raise Exception
 
     def _encode_contexts_cub2011(self):
         wiki_dir = '/project/data/Raw_Wiki_Articles/CUBird_WikiArticles'
@@ -78,22 +59,10 @@ class ContextEncoder():
         else:
             save_path = f"{self.config['save_text_features']}{self.config['text_encoder']}.mat"
 
-        if os.path.exists(save_path):
-            print(f"{IDENTITY} already used this config to encode text. Using _load_features() instead")
-            self._load_features(save_path)
-        else:
-            semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
+        semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
+        contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
 
-            # self.text_encoder('some text')
-            self.contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
-
-            # self.contexts = [torch.from_numpy(self.text_encoder.encode_long_text(article)).type(torch.float32) for article in semantic]
-            self.contexts = torch.stack(self.contexts)
-
-            if self.config['save_text_features']:
-                features = [feature.cpu().numpy() for feature in self.contexts]
-                mdic = {'features': features}
-                savemat(save_path, mdic)
+        self.attributes = [feature.cpu().numpy() for feature in self.contexts]
 
     def _encode_contexts_imagenet(self):
         class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"

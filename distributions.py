@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import math
-from myutils import sum_except_batch, mean_except_batch
+from utils import sum_except_batch, mean_except_batch
 from torch.distributions import Distribution as TorchDistribution
 
 class Distribution(nn.Module):

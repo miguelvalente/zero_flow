@@ -9,7 +9,7 @@ lr_c:
   value: 0.01
 zero_test:
   desc: The type of classification to be performed
-  value: zero #zero #seen #_zero #all #zero seen_zero all_with_text
+  value: seen_zero #zero #seen #_zero #all #zero seen_zero all_with_text
 context_sampling:
   desc: Use sampling of semantic distribution instead of a fixed vector 
   value: True 

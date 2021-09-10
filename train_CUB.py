@@ -5,7 +5,7 @@ import json
 import random
 import argparse
 import classifier
-from utils import *
+from utils import Result, synthesize_feature, save_model, log_print
 import torch.nn as nn
 import torch.optim as optim
 import FrEIA.framework as Ff
@@ -25,6 +25,8 @@ import torch.distributions as dist
 import wandb
 import yaml
 import tqdm
+import numpy as np
+import torch
 
 
 # run = wandb.init(project='zero_flow_CUB_2.0', entity='mvalente',
@@ -49,11 +51,11 @@ parser.add_argument('--num_coupling_layers', type=int, default=5, help='number o
 
 parser.add_argument('--disp_interval', type=int, default=200)
 parser.add_argument('--save_interval', type=int, default=10000)
-parser.add_argument('--evl_interval',  type=int, default=500)
+parser.add_argument('--evl_interval', type=int, default=500)
 parser.add_argument('--manualSeed', type=int, default=6152, help='manual seed')
-parser.add_argument('--input_dim',     type=int, default=1024, help='dimension of the global semantic vectors')
+parser.add_argument('--input_dim', type=int, default=1024, help='dimension of the global semantic vectors')
 
-parser.add_argument('--prototype',    type=float, default=1, help='weight of the prototype loss')
+parser.add_argument('--prototype', type=float, default=1, help='weight of the prototype loss')
 parser.add_argument('--pi', type=float, default=0.05, help='degree of the perturbation')
 parser.add_argument('--dropout', type=float, default=0.0, help='probability of dropping a dimension'
                                                                'in the perturbation noise')
@@ -84,8 +86,8 @@ def train():
     opt.C_dim = dataset.att_dim
     opt.X_dim = dataset.feature_dim
     opt.y_dim = dataset.ntrain_class
-    out_dir = 'out/{}/mask-{}_pi-{}_c-{}_ns-{}_wd-{}_lr-{}_nS-{}_bs-{}_ps-{}'.format(opt.dataset, opt.dropout, opt.pi, opt.prototype,
-               opt.nSample, opt.weight_decay, opt.lr, opt.nSample, opt.batchsize, opt.pi)
+    out_dir = 'out/{}/mask-{}_pi-{}_c-{}_ns-{}_wd-{}_lr-{}_nS-{}_bs-{}_ps-{}'.format(
+        opt.dataset, opt.dropout, opt.pi, opt.prototype, opt.nSample, opt.weight_decay, opt.lr, opt.nSample, opt.batchsize, opt.pi)
     os.makedirs(out_dir, exist_ok=True)
     print("The output dictionary is {}".format(out_dir))
 
@@ -96,7 +98,7 @@ def train():
 
     dataset.feature_dim = dataset.train_feature.shape[1]
     data_layer = FeatDataLayer(dataset.train_label.numpy(), dataset.train_feature.cpu().numpy(), opt)
-    opt.niter = int(dataset.ntrain/opt.batchsize) * opt.gen_nepoch
+    opt.niter = int(dataset.ntrain / opt.batchsize) * opt.gen_nepoch
 
     result_gzsl_soft = Result()
     sim = cosine_similarity(dataset.train_att, dataset.train_att)
@@ -104,14 +106,9 @@ def train():
     min = dataset.train_att[min_idx]
     max_idx = np.argmax(sim.sum(-1))
     max = dataset.train_att[max_idx]
-    medi_idx = np.argwhere(sim.sum(-1)==np.sort(sim.sum(-1))[int(sim.shape[0]/2)])
+    medi_idx = np.argwhere(sim.sum(-1) == np.sort(sim.sum(-1))[int(sim.shape[0] / 2)])
     medi = dataset.train_att[int(medi_idx)]
-    vertices = torch.from_numpy(np.stack((min,max,medi))).float().cuda()
-
-
-
-
-
+    vertices = torch.from_numpy(np.stack((min, max, medi))).float().cuda()
 
     input_dim = 2048
     context_dim = 1024  # contexts[0].shape.numel()
@@ -137,18 +134,11 @@ def train():
             split_dim,
             context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net='MLP'))
 
-
-
-
-
     flow = Flow(transform, base_dist).cuda()
-
-
-    # flow = cINN(opt).cuda()
 
     sm = GSModule(vertices, int(opt.input_dim)).cuda()
     print(flow)
-    optimizer = optim.Adam(list(flow.parameters())+list(sm.parameters()), lr=opt.lr, weight_decay=opt.weight_decay)
+    optimizer = optim.Adam(list(flow.parameters()) + list(sm.parameters()), lr=opt.lr, weight_decay=opt.weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, gamma=0.8, step_size=15)
 
     mse = nn.MSELoss()
@@ -160,8 +150,8 @@ def train():
     prototype_loss = 0
 
     x_mean = torch.from_numpy(dataset.tr_cls_centroid).cuda()
-    iters = math.ceil(dataset.ntrain/opt.batchsize)
-    for it in tqdm.tqdm(range(start_step, opt.niter+1), desc='Iterations'):
+    iters = math.ceil(dataset.ntrain / opt.batchsize)
+    for it in tqdm.tqdm(range(start_step, opt.niter + 1), desc='Iterations'):
         flow.zero_grad()
         sm.zero_grad()
 
@@ -178,7 +168,7 @@ def train():
         z = opt.pi * torch.randn(opt.batchsize, 2048).cuda()
         mask = torch.cuda.FloatTensor(2048).uniform_() > opt.dropout
         z = mask * z
-        X = X+z
+        X = X + z
 
         log_prob, ldj = flow.log_prob(X, sr)
         log_prob += ldj
@@ -194,26 +184,24 @@ def train():
 
         loss.backward(retain_graph=True)
 
-        if opt.prototype>0.0:
+        if opt.prototype > 0.0:
             with torch.no_grad():
                 sr = sm(torch.from_numpy(dataset.train_att).cuda())
             z = torch.zeros(dataset.ntrain_class, 2048).cuda()
             # x_ = flow.reverse_sample(z, sr)
             x_ = flow.generation(torch.cat((sr, visual_distribution.sample((sr.shape[0],))), dim=1))
-            prototype_loss = opt.prototype*mse(x_, x_mean)
+            prototype_loss = opt.prototype * mse(x_, x_mean)
             prototype_loss.backward()
-
 
         optimizer.step()
         if it % iters == 0:
             lr_scheduler.step()
         if it % opt.disp_interval == 0 and it:
             log_text = 'Iter-[{}/{}]; loss: {:.3f}; prototype_loss:{:.3f};'.format(it, opt.niter, loss.item(),
-                                                                                  prototype_loss.item())
+                                                                                   prototype_loss.item())
             log_print(log_text, log_dir)
 
         if it % opt.evl_interval == 0 and it > 2000:
-        # if True:
             flow.eval()
             sm.eval()
             gen_feat, gen_label = synthesize_feature(flow, sm, dataset, opt)
@@ -223,14 +211,14 @@ def train():
 
             """ GZSL"""
 
-            cls = classifier.CLASSIFIER(opt, train_X, train_Y, dataset,  dataset.test_seen_feature,  dataset.test_unseen_feature,
-                                dataset.ntrain_class + dataset.ntest_class, True, opt.classifier_lr, 0.5, 30, 3000, True)
+            cls = classifier.CLASSIFIER(opt, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
+                                        dataset.ntrain_class + dataset.ntest_class, True, opt.classifier_lr, 0.5, 30, 3000, True)
 
             result_gzsl_soft.update_gzsl(it, cls.acc_seen, cls.acc_unseen, cls.H)
 
             log_print("GZSL Softmax:", log_dir)
             log_print("U->T {:.2f}%  S->T {:.2f}%  H {:.2f}%  Best_H [{:.2f}% {:.2f}% {:.2f}% | Iter-{}]".format(
-                cls.acc_unseen, cls.acc_seen, cls.H,  result_gzsl_soft.best_acc_U_T, result_gzsl_soft.best_acc_S_T,
+                cls.acc_unseen, cls.acc_seen, cls.H, result_gzsl_soft.best_acc_U_T, result_gzsl_soft.best_acc_S_T,
                 result_gzsl_soft.best_acc, result_gzsl_soft.best_iter), log_dir)
 
             if result_gzsl_soft.save_model:
@@ -239,8 +227,8 @@ def train():
                     os.remove(_i)
                 save_model(it, flow, sm, opt.manualSeed, log_text,
                            out_dir + '/Best_model_GZSL_H_{:.2f}_S_{:.2f}_U_{:.2f}.tar'.format(result_gzsl_soft.best_acc,
-                                                                                             result_gzsl_soft.best_acc_S_T,
-                                                                                             result_gzsl_soft.best_acc_U_T))
+                                                                                              result_gzsl_soft.best_acc_S_T,
+                                                                                              result_gzsl_soft.best_acc_U_T))
 
             sm.train()
             flow.train()
@@ -248,44 +236,6 @@ def train():
                 save_model(it, flow, sm, opt.manualSeed, log_text,
                            out_dir + '/Iter_{:d}.tar'.format(it))
                 print('Save model to ' + out_dir + '/Iter_{:d}.tar'.format(it))
- 
-class cINN(nn.Module):
-    '''cINN for class-conditional MNISt generation'''
-    def __init__(self, opt):
-        super().__init__()
-        self.opt = opt
-        self.cinn = self.build_inn()
-
-        self.trainable_parameters = [p for p in self.cinn.parameters() if p.requires_grad]
-        for p in self.trainable_parameters:
-            p.data = 0.01 * torch.randn_like(p)
-
-    def build_inn(self):
-
-        def subnet(ch_in, ch_out):
-            return nn.Sequential(nn.Linear(ch_in, 2048),
-                                 nn.LeakyReLU(0.2),
-                                 nn.Linear(2048, ch_out))
-
-        cond = Ff.ConditionNode(1024)
-        nodes = [Ff.InputNode(2048)]
-        nodes.append(Ff.Node(nodes[-1], Fm.Flatten, {}))
-
-        for k in range(opt.num_coupling_layers):
-            # nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed':k}))
-            nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
-                                 {'subnet_constructor':subnet, 'clamp':1.0},
-                                 conditions=cond))
-
-        return Ff.ReversibleGraphNet(nodes + [cond, Ff.OutputNode(nodes[-1])], verbose=False)
-
-    def forward(self, x, c):
-        z = self.cinn(x, c)
-        jac = self.cinn.log_jacobian(run_forward=False)
-        return z, jac
-
-    def reverse_sample(self, z, c):
-        return self.cinn(z, c, rev=True)
 
 class LinearModule(nn.Module):
     def __init__(self, vertice, out_dim):
@@ -303,7 +253,7 @@ class GSModule(nn.Module):
         super(GSModule, self).__init__()
         self.individuals = nn.ModuleList()
         assert vertices.dim() == 2, 'invalid shape : {:}'.format(vertices.shape)
-        self.out_dim     = out_dim
+        self.out_dim = out_dim
         self.require_adj = False
         for i in range(vertices.shape[0]):
             layer = LinearModule(vertices[i], out_dim)

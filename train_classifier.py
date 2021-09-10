@@ -41,7 +41,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project='zero_classifier_CUB', entity='mvalente',
                  config=r'config/classifier.yaml')
 
-wandb.config['checkpoint'] = 'misty-wood-106-20.pth'
+wandb.config['checkpoint'] = 'proud-water-107-20.pth'
 
 state = torch.load(f"{SAVE_PATH}{wandb.config['checkpoint']}")
 wandb.config['split'] = state['split']
