@@ -11,8 +11,7 @@ from PIL import Image
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 
-from convert import VisualExtractor
-from dataloaders.visual_encoder import VisualEncoder
+from visual_encoder.visual_encoder import VisualEncoder
 
 from text_encoders.context_encoder import ContextEncoder
 from scipy.io import loadmat, savemat
@@ -23,11 +22,19 @@ with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml
     config = yaml.safe_load(d)
     config.update(yaml.safe_load(c))
 
-encoder = VisualExtractor(config=config)
-cub = VisualEncoder(config=config, root='/project/data/', encoder=encoder)
-cub.train
-cub.validate
+data = loadmat("data/data/CUB/data.mat")
+label = loadmat("data/data/CUB/label.mat")
 
+encoder = VisualEncoder(config)
+encoder.seen_id
+encoder.unseen_id
+encoder.train
+encoder.validate
+encoder.test_unseen
+encoder.test_seen
+encoder.targets
+
+features = torch.arange((11788 * 2048)).reshape(11788, -1)
 context_encoder = ContextEncoder(config, device=device)
 contexts = context_encoder.contexts.to(device)
 

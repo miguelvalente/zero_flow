@@ -6,14 +6,14 @@ import numpy.random as random
 import pandas as pd
 import torch
 from scipy.io import loadmat, savemat
-from torchvision.datasets.folder import default_loader
 from torchvision.datasets.utils import download_url
 from tqdm import tqdm
+from torch.utils.data import Dataset
 import numpy as np
 
-IDENTITY = 'CUB Encoder| '
+IDENTITY = 'Visual Encoder| '
 
-class VisualEncoder():
+class Cub2011(Dataset):
     '''
     Base dataset class for encoding cub
     '''
@@ -21,11 +21,10 @@ class VisualEncoder():
     url = 'http://www.vision.caltech.edu/visipedia-data/CUB-200-2011/CUB_200_2011.tgz'
     filename = 'CUB_200_2011.tgz'
 
-    def __init__(self, root, encoder=None, config=None, loader=default_loader, download=False):
+    def __init__(self, root, encoder=None, config=None, download=False):
         self.root = os.path.expanduser(root)
         self.encoder = encoder
         self.config = config
-        self.loader = default_loader
 
         if download:
             self._download()
@@ -59,8 +58,6 @@ class VisualEncoder():
         except Exception:
             return False
 
-        self._encode_images()
-
     def _load_metadata(self):
         images = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'images.txt'), sep=' ',
                              names=['img_id', 'filepath'])
@@ -71,27 +68,13 @@ class VisualEncoder():
 
         data = images.merge(image_class_labels, on='img_id')
         self.data = data.merge(train_test_split, on='img_id')
+        self.img_paths = [os.path.join(self.root, self.base_folder, img) for img in self.data['filepath']]  # Maybe.tolist()
 
         self.seen_id = self.data[self.data['seen_unseen'] == 1].target.unique()
         self.unseen_id = self.data[self.data['seen_unseen'] == 0].target.unique()
 
         self.train = self.data[self.data['split'] == 1].img_id.values
         self.validate = self.data[self.data['split'] == 0].img_id.values
-        self.text_unseen = self.data[(self.data.split == 0) & (self.data.seen_unseen == 0)]
-        self.text_seen = self.data[(self.data.split == 0) & (self.data.seen_unseen == 1)]
-        print()
-
-    def _encode_images(self):
-        save_path = f"{self.config['save_visual_features']}{self.config['image_encoder']}.mat"
-
-        img_paths = [os.path.join(self.root, self.base_folder, img) for img in self.data['filepath']]  # Maybe.tolist()
-
-        visual_features = []
-        for img in tqdm(img_paths, desc=f"({self.config['split']}): Extracting Visual Features"):
-            img = self.loader(img)
-            if self.encoder is not None:
-                img = self.encoder(img)
-            visual_features.append(img)
-
-        self.targets = list(self.data['target'])
-        self.features = [feature.numpy() for feature in visual_features]
+        self.test_unseen = self.data[(self.data.split == 0) & (self.data.seen_unseen == 0)].img_id.values
+        self.test_seen = self.data[(self.data.split == 0) & (self.data.seen_unseen == 1)].img_id.values
+        self.targets = self.data.target.values
