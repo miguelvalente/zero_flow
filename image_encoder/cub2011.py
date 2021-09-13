@@ -73,8 +73,8 @@ class Cub2011(Dataset):
         self.seen_id = self.data[self.data['seen_unseen'] == 1].target.unique()
         self.unseen_id = self.data[self.data['seen_unseen'] == 0].target.unique()
 
-        self.train = self.data[self.data['split'] == 1].img_id.values
-        self.validate = self.data[self.data['split'] == 0].img_id.values
-        self.test_unseen = self.data[(self.data.split == 0) & (self.data.seen_unseen == 0)].img_id.values
-        self.test_seen = self.data[(self.data.split == 0) & (self.data.seen_unseen == 1)].img_id.values
+        self.train_loc = self.data[self.data['split'] == 1].img_id.values
+        self.validate_loc = self.data[self.data['split'] == 0].img_id.values
+        self.test_unseen_loc = self.data[(self.data.split == 0) & (self.data.seen_unseen == 0)].img_id.values
+        self.test_seen_loc = self.data[(self.data.split == 0) & (self.data.seen_unseen == 1)].img_id.values
         self.targets = self.data.target.values

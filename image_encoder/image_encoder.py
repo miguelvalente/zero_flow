@@ -13,11 +13,11 @@ from torchvision.datasets.folder import default_loader
 from torchvision.datasets.utils import download_url
 from tqdm import tqdm
 import numpy as np
-from visual_encoder.cub2011 import Cub2011
+from image_encoder.cub2011 import Cub2011
 
-IDENTITY = 'Visual Encoder| '
+IDENTITY = 'Image Encoder| '
 
-class VisualEncoder():
+class ImageEncoder():
     def __init__(self, config, device='cpu'):
         self.config = config
         self.device = device
@@ -57,10 +57,10 @@ class VisualEncoder():
         self.seen_id = cub.seen_id
         self.unseen_id = cub.unseen_id
 
-        self.train = cub.train
-        self.validate = cub.validate
-        self.test_unseen = cub.test_unseen
-        self.test_seen = cub.test_seen
+        self.train_loc = cub.train_loc
+        self.validate_loc = cub.validate_loc
+        self.test_unseen_loc = cub.test_unseen_loc
+        self.test_seen_loc = cub.test_seen_loc
         self.targets = cub.targets
 
         visual_features = []

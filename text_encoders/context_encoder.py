@@ -35,7 +35,7 @@ class ContextEncoder():
             self.text_encoder = WordEmbeddings(self.config, device=self.device)
         else:
             print(f"{IDENTITY} Encoding setting not found")
-            raise
+            raise Exception
 
         if self.config['dataset'] == 'imagenet':
             self._encode_contexts_imagenet()
@@ -62,7 +62,7 @@ class ContextEncoder():
         semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
         contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
 
-        self.attributes = [feature.cpu().numpy() for feature in self.contexts]
+        self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
 
     def _encode_contexts_imagenet(self):
         class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
