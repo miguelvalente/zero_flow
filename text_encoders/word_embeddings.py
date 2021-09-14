@@ -54,7 +54,9 @@ def load_txt_embeddings(emb_file):
 class WordEmbeddings:
     def __init__(self, config, device):
         self.config = config
-        self.emb_file = Path(self.config['glove_dir'])
+        self.emb_file = Path("project/data/glove.840B.300d.txt" #  Path(self.config['glove_dir'])
+
+
         self.emb, self.emb_dim = load_embeddings(self.emb_file)
 
         # stanza.download('en')

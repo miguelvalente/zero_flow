@@ -1,18 +1,19 @@
 import itertools as it
-import timm
-from timm.data import resolve_data_config
-from timm.data.transforms_factory import create_transform
 import os
 from collections import Counter
 
+import numpy as np
 import numpy.random as random
 import pandas as pd
+import timm
 import torch
 from scipy.io import loadmat, savemat
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
 from torchvision.datasets.folder import default_loader
 from torchvision.datasets.utils import download_url
 from tqdm import tqdm
-import numpy as np
+
 from image_encoder.cub2011 import Cub2011
 
 IDENTITY = 'Image Encoder| '

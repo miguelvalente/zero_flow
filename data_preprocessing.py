@@ -1,7 +1,8 @@
 import os
+import sys
 
-import numpy as np
 import timm
+import numpy as np
 import torch
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
@@ -20,8 +21,10 @@ IDENTITY = 'Data Preprocess | '
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
+    image_config = yaml.safe_load(d)
+    text_config = yaml.safe_load(c)
     config = yaml.safe_load(d)
-    config.update(yaml.safe_load(c))
+    config = config.update(yaml.safe_load(c))
 
 image_mat_path = f"data/CUB_200_2011/mat/visual/{config['image_encoder']}"
 text_mat_path = f"data/CUB_200_2011/mat/text/{config['text_encoder']}"
@@ -29,6 +32,7 @@ data_dic_path = f"data/CUB_200_2011/mat/{config['image_encoder']}_{config['text_
 
 if os.path.exists(data_dic_path):
     print(f'{IDENTITY} {data_dic_path} already exists.')
+    sys.exit()
 
 if os.path.exists(image_mat_path):
     print(f'{IDENTITY} .mat exists. Loading {image_mat_path} instead of encoding images.')
@@ -40,7 +44,8 @@ else:
                  'unseen_id': image_encoder.unseen_id,
                  'train_loc': image_encoder.train_loc,
                  'test_seen_loc': image_encoder.test_seen_loc,
-                 'test_unseen_loc': image_encoder.test_unseen_loc}
+                 'test_unseen_loc': image_encoder.test_unseen_loc,
+                 'image_config': image_config}
     savemat(f"data/CUB_200_2011/mat/visual/{config['image_encoder']}", image_dic)
 
 if os.path.exists(text_mat_path):
@@ -48,7 +53,8 @@ if os.path.exists(text_mat_path):
     semantic_dic = loadmat(text_mat_path)
 else:
     context_encoder = ContextEncoder(config, device=device)
-    semantic_dic = {'attribute': context_encoder.attributes}
+    semantic_dic = {'attribute': context_encoder.attributes,
+                    'text_config': text_config}
     savemat(f"data/CUB_200_2011/mat/text/{config['text_encoder']}", semantic_dic)
 
 data_dic = {'att_train': 0,
@@ -57,6 +63,7 @@ data_dic = {'att_train': 0,
             'unseen_pro': semantic_dic['attributes'][image_dic['unseen_id'] - 1],
             'train_fea': image_dic['features'][image_dic['train_loc'] - 1],
             'test_seen_fea': image_dic['features'][image_dic['test_seen_loc'] - 1],
-            'test_unseen_fea': image_dic['features'][image_dic['test_unseen_loc'] - 1]}
+            'test_unseen_fea': image_dic['features'][image_dic['test_unseen_loc'] - 1],
+            'processing_config': config}
 
 savemat(f"data/CUB_200_2011/mat/{config['image_encoder']}_{config['text_encoder']}", data_dic)

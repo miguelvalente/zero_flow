@@ -1,7 +1,7 @@
 epochs:
   desc: Number of epochs to train over
   value: 21
-batch_size:
+batchsize:
   desc: Size of each batch
   value: 256
 lr:
@@ -28,6 +28,58 @@ wt_c_l:
 wt_mmd_l:
   desc: weight for the mmd loss
   value: 0.1
+dataroot:
+  desc: path to dataset
+  value: 'data/data'
+validation:
+  desc: enable cross validation mode
+  value: False
+workers:
+  desc: number of data loading workers
+  value: 4
+lr:
+  desc: learning rate of flow
+  value: 0.0003
+weight_decay:
+  desc:
+  value: 1e-5
+classifier_lr:
+  desc: learning rate to train softmax classifier'
+  value: 0.01
+number_sample:
+  desc: number features to generate per class
+  value: 600
+disp_interval:
+  desc: interval
+  value: 200
+save_interval:
+  desc: save inetrvak of checkpoint
+  value: 10000
+evl_interval:
+  desc: eval interval
+  value: 500
+manualSeed:
+  desc: manual seed
+  value: 6400
+semantic_vector_dim:
+  desc: Dimension of semantic vectors
+  value: 1024
+prototype:
+  desc: weight of the prototype loss
+  value: 1
+pi:
+  desc: degree of the perturbation
+  value: 0.05
+dropout:
+  desc: probaility of droping dimension in he perturbation noise
+  value: 0.0
+zsl:
+  desc: The paradigm of zero-shot learning
+  value: False
+clusters:
+  desc:
+  value: 3
+
 wt_p_l: 
   desc: weigth of prototype loss 
   value: 0

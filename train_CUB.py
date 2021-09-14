@@ -29,76 +29,54 @@ import numpy as np
 import torch
 
 
-# run = wandb.init(project='zero_flow_CUB_2.0', entity='mvalente',
-                #  config=r'config/flow.yaml')
+run = wandb.init(project='zero_flow_CUB_2.0', entity='mvalente',
+                 config=r'config/flow.yaml')
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', default='CUB')
-parser.add_argument('--dataroot', default='data/data', help='path to dataset')
-parser.add_argument('--validation', action='store_true', default=False, help='enable cross validation mode')
-parser.add_argument('--workers', type=int, help='number of data loading workers', default=4)
-parser.add_argument('--image_embedding', default='res101', type=str)
-parser.add_argument('--class_embedding', default='att', type=str)
+with open('config/classifier.yaml', 'r') as c:
+    wandb.config.update(yaml.safe_load(c))
 
-parser.add_argument('--gen_nepoch', type=int, default=600, help='number of epochs to train for')
-parser.add_argument('--lr', type=float, default=0.0003, help='learning rate to train generater')
-parser.add_argument('--weight_decay', type=float, default=1e-5, help='weight_decay')
+config = wandb.config
 
-parser.add_argument('--classifier_lr', type=float, default=0.01, help='learning rate to train softmax classifier')
-parser.add_argument('--batchsize', type=int, default=256, help='input batch size')
-parser.add_argument('--nSample', type=int, default=600, help='number features to generate per class')
-parser.add_argument('--num_coupling_layers', type=int, default=5, help='number of coupling layers')
+# image_embedding', default='res101', type=str)
+#   desc:
+#   value:, default='data/data', help='path to dataset')
+# class_embedding', default='att', type=str)
+#   desc:
+#   value:, default='data/data', help='path to dataset')
 
-parser.add_argument('--disp_interval', type=int, default=200)
-parser.add_argument('--save_interval', type=int, default=10000)
-parser.add_argument('--evl_interval', type=int, default=500)
-parser.add_argument('--manualSeed', type=int, default=6152, help='manual seed')
-parser.add_argument('--input_dim', type=int, default=1024, help='dimension of the global semantic vectors')
+os.environ['CUDA_VISIBLE_DEVICES'] = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-parser.add_argument('--prototype', type=float, default=1, help='weight of the prototype loss')
-parser.add_argument('--pi', type=float, default=0.05, help='degree of the perturbation')
-parser.add_argument('--dropout', type=float, default=0.0, help='probability of dropping a dimension'
-                                                               'in the perturbation noise')
-
-parser.add_argument('--zsl', default=False)
-parser.add_argument('--clusters', type=int, default=3)
-
-parser.add_argument('--gpu', default="0", help='index of GPU to use')
-opt = parser.parse_args()
-os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpu
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-if opt.manualSeed is None:
-    opt.manualSeed = random.randint(1, 10000)
-print("Random Seed: ", opt.manualSeed)
-np.random.seed(opt.manualSeed)
-random.seed(opt.manualSeed)
-torch.manual_seed(opt.manualSeed)
-torch.cuda.manual_seed_all(opt.manualSeed)
+if config.manualSeed is None:
+    config.manualSeed = random.randint(1, 10000)
+print("Random Seed: ", config.manualSeed)
+np.random.seed(config.manualSeed)
+random.seed(config.manualSeed)
+torch.manual_seed(config.manualSeed)
+torch.cuda.manual_seed_all(config.manualSeed)
 
 cudnn.benchmark = True
 print('Running parameters:')
-print(json.dumps(vars(opt), indent=4, separators=(',', ': ')))
+print(json.dumps(vars(config), indent=4, separators=(',', ': ')))
 
 
 def train():
-    dataset = DATA_LOADER(opt)
-    opt.C_dim = dataset.att_dim
-    opt.X_dim = dataset.feature_dim
-    opt.y_dim = dataset.ntrain_class
+    dataset = DATA_LOADER(config)
+    config.C_dim = dataset.att_dim
+    config.X_dim = dataset.feature_dim
+    config.y_dim = dataset.ntrain_class
     out_dir = 'out/{}/mask-{}_pi-{}_c-{}_ns-{}_wd-{}_lr-{}_nS-{}_bs-{}_ps-{}'.format(
-        opt.dataset, opt.dropout, opt.pi, opt.prototype, opt.nSample, opt.weight_decay, opt.lr, opt.nSample, opt.batchsize, opt.pi)
+        config.dataset, config.dropout, config.pi, config.prototype, config.nSample, config.weight_decay, config.lr, config.nSample, config.batchsize, config.pi)
     os.makedirs(out_dir, exist_ok=True)
     print("The output dictionary is {}".format(out_dir))
 
-    log_dir = out_dir + '/log_{}.txt'.format(opt.dataset)
+    log_dir = out_dir + '/log_{}.txt'.format(config.dataset)
     with open(log_dir, 'w') as f:
         f.write('Training Start:')
         f.write(strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()) + '\n')
 
     dataset.feature_dim = dataset.train_feature.shape[1]
-    data_layer = FeatDataLayer(dataset.train_label.numpy(), dataset.train_feature.cpu().numpy(), opt)
-    opt.niter = int(dataset.ntrain / opt.batchsize) * opt.gen_nepoch
+    data_layer = FeatDataLayer(dataset.train_label.numpy(), dataset.train_feature.cpu().numpy(), config)
+    config.niter = int(dataset.ntrain / config.batchsize) * config.gen_nepoch
 
     result_gzsl_soft = Result()
     sim = cosine_similarity(dataset.train_att, dataset.train_att)
@@ -111,7 +89,7 @@ def train():
     vertices = torch.from_numpy(np.stack((min, max, medi))).float().cuda()
 
     input_dim = 2048
-    context_dim = 1024  # contexts[0].shape.numel()
+    context_dim = config['semantic_vector_dim']  # contexts[0].shape.numel()
     split_dim = input_dim - context_dim
 
     semantic_distribution = SemanticDistribution(torch.tensor(dataset.train_att).cuda(), torch.ones(context_dim).cuda())
@@ -136,9 +114,9 @@ def train():
 
     flow = Flow(transform, base_dist).cuda()
 
-    sm = GSModule(vertices, int(opt.input_dim)).cuda()
+    sm = GSModule(vertices, int(config['semantic_vector_dim')).cuda()
     print(flow)
-    optimizer = optim.Adam(list(flow.parameters()) + list(sm.parameters()), lr=opt.lr, weight_decay=opt.weight_decay)
+    optimizer = optim.Adam(list(flow.parameters()) + list(sm.parameters()), lr=config.lr, weight_decay=config.weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, gamma=0.8, step_size=15)
 
     mse = nn.MSELoss()
@@ -150,8 +128,8 @@ def train():
     prototype_loss = 0
 
     x_mean = torch.from_numpy(dataset.tr_cls_centroid).cuda()
-    iters = math.ceil(dataset.ntrain / opt.batchsize)
-    for it in tqdm.tqdm(range(start_step, opt.niter + 1), desc='Iterations'):
+    iters = math.ceil(dataset.ntrain / config.batchsize)
+    for it in tqdm.tqdm(range(start_step, config.niter + 1), desc='Iterations'):
         flow.zero_grad()
         sm.zero_grad()
 
@@ -165,8 +143,8 @@ def train():
         X = torch.from_numpy(feat_data).cuda()
 
         sr = sm(C)
-        z = opt.pi * torch.randn(opt.batchsize, 2048).cuda()
-        mask = torch.cuda.FloatTensor(2048).uniform_() > opt.dropout
+        z = config.pi * torch.randn(config.batchsize, 2048).cuda()
+        mask = torch.cuda.FloatTensor(2048).uniform_() > config.dropout
         z = mask * z
         X = X + z
 
@@ -184,35 +162,35 @@ def train():
 
         loss.backward(retain_graph=True)
 
-        if opt.prototype > 0.0:
+        if config.prototype > 0.0:
             with torch.no_grad():
                 sr = sm(torch.from_numpy(dataset.train_att).cuda())
             z = torch.zeros(dataset.ntrain_class, 2048).cuda()
             # x_ = flow.reverse_sample(z, sr)
             x_ = flow.generation(torch.cat((sr, visual_distribution.sample((sr.shape[0],))), dim=1))
-            prototype_loss = opt.prototype * mse(x_, x_mean)
+            prototype_loss = config.prototype * mse(x_, x_mean)
             prototype_loss.backward()
 
         optimizer.step()
         if it % iters == 0:
             lr_scheduler.step()
-        if it % opt.disp_interval == 0 and it:
-            log_text = 'Iter-[{}/{}]; loss: {:.3f}; prototype_loss:{:.3f};'.format(it, opt.niter, loss.item(),
+        if it % config.disp_interval == 0 and it:
+            log_text = 'Iter-[{}/{}]; loss: {:.3f}; prototype_loss:{:.3f};'.format(it, config.niter, loss.item(),
                                                                                    prototype_loss.item())
             log_print(log_text, log_dir)
 
-        if it % opt.evl_interval == 0 and it > 2000:
+        if it % config.evl_interval == 0 and it > 2000:
             flow.eval()
             sm.eval()
-            gen_feat, gen_label = synthesize_feature(flow, sm, dataset, opt)
+            gen_feat, gen_label = synthesize_feature(flow, sm, dataset, config)
 
             train_X = torch.cat((dataset.train_feature, gen_feat), 0)
             train_Y = torch.cat((dataset.train_label, gen_label + dataset.ntrain_class), 0)
 
             """ GZSL"""
 
-            cls = classifier.CLASSIFIER(opt, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
-                                        dataset.ntrain_class + dataset.ntest_class, True, opt.classifier_lr, 0.5, 30, 3000, True)
+            cls = classifier.CLASSIFIER(config, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
+                                        dataset.ntrain_class + dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, True)
 
             result_gzsl_soft.update_gzsl(it, cls.acc_seen, cls.acc_unseen, cls.H)
 
@@ -225,15 +203,15 @@ def train():
                 files2remove = glob.glob(out_dir + '/Best_model_GZSL_*')
                 for _i in files2remove:
                     os.remove(_i)
-                save_model(it, flow, sm, opt.manualSeed, log_text,
+                save_model(it, flow, sm, config.manualSeed, log_text,
                            out_dir + '/Best_model_GZSL_H_{:.2f}_S_{:.2f}_U_{:.2f}.tar'.format(result_gzsl_soft.best_acc,
                                                                                               result_gzsl_soft.best_acc_S_T,
                                                                                               result_gzsl_soft.best_acc_U_T))
 
             sm.train()
             flow.train()
-            if it % opt.save_interval == 0 and it:
-                save_model(it, flow, sm, opt.manualSeed, log_text,
+            if it % config.save_interval == 0 and it:
+                save_model(it, flow, sm, config.manualSeed, log_text,
                            out_dir + '/Iter_{:d}.tar'.format(it))
                 print('Save model to ' + out_dir + '/Iter_{:d}.tar'.format(it))
 
