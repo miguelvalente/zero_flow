@@ -1,42 +1,48 @@
-import os
-import math
+import argparse
+from scipy.io import loadmat, savemat
 import glob
 import json
+import math
+import os
 import random
-import argparse
-import classifier
-from utils import Result, synthesize_feature, save_model, log_print
-import torch.nn as nn
-import torch.optim as optim
-import FrEIA.framework as Ff
-import FrEIA.modules as Fm
-import torch.nn.functional as F
 from time import gmtime, strftime
-import torch.backends.cudnn as cudnn
-from dataloaders.dataset_GBU import FeatDataLayer, DATA_LOADER
-from sklearn.metrics.pairwise import cosine_similarity
 
-from transform import Flow
-from distributions import SemanticDistribution, DoubleDistribution
-from permuters import LinearLU, Permuter, Reverse
-from act_norm import ActNormBijection
-from affine_coupling import AffineCoupling
-import torch.distributions as dist
-import wandb
-import yaml
-import tqdm
 import numpy as np
 import torch
+import torch.backends.cudnn as cudnn
+import torch.distributions as dist
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import tqdm
+import yaml
+from sklearn.metrics.pairwise import cosine_similarity
 
+import classifier
+import wandb
+from act_norm import ActNormBijection
+from affine_coupling import AffineCoupling
+from dataloaders.dataset_GBU import DATA_LOADER, FeatDataLayer
+from distributions import DoubleDistribution, SemanticDistribution
+from permuters import LinearLU, Permuter, Reverse
+from transform import Flow
+from utils import Result, log_print, save_model, synthesize_feature
 
-run = wandb.init(project='zero_flow_CUB_2.0', entity='mvalente',
+CUDA_LAUNCH_BLOCKING = 1
+os.environ['WANDB_MODE'] = 'online'
+run = wandb.init(project='zero_flow_CUB', entity='mvalente',
                  config=r'config/flow.yaml')
 
-with open('config/classifier.yaml', 'r') as c:
-    wandb.config.update(yaml.safe_load(c))
+# with open('config/classifier.yaml', 'r') as c:
+#     wandb.config.update(yaml.safe_load(c))
 
 config = wandb.config
-
+# data = loadmat(config.data_dir)
+wandb.config['image_encoder'] = 'resnet50d'
+wandb.config['text_encoder'] = 'glove'
+wandb.define_metric('Harmonic Mean', summary='max')
+wandb.define_metric('Accuracy Unseen', summary='max')
+wandb.define_metric('Accuracy Seen', summary='max')
 # image_embedding', default='res101', type=str)
 #   desc:
 #   value:, default='data/data', help='path to dataset')
@@ -44,7 +50,8 @@ config = wandb.config
 #   desc:
 #   value:, default='data/data', help='path to dataset')
 
-os.environ['CUDA_VISIBLE_DEVICES'] = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+#  torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if config.manualSeed is None:
     config.manualSeed = random.randint(1, 10000)
@@ -55,8 +62,8 @@ torch.manual_seed(config.manualSeed)
 torch.cuda.manual_seed_all(config.manualSeed)
 
 cudnn.benchmark = True
-print('Running parameters:')
-print(json.dumps(vars(config), indent=4, separators=(',', ': ')))
+# print('Running parameters:')
+# print(json.dumps(vars(config), indent=4, separators=(',', ': ')))
 
 
 def train():
@@ -65,7 +72,9 @@ def train():
     config.X_dim = dataset.feature_dim
     config.y_dim = dataset.ntrain_class
     out_dir = 'out/{}/mask-{}_pi-{}_c-{}_ns-{}_wd-{}_lr-{}_nS-{}_bs-{}_ps-{}'.format(
-        config.dataset, config.dropout, config.pi, config.prototype, config.nSample, config.weight_decay, config.lr, config.nSample, config.batchsize, config.pi)
+        config.dataset, config.dropout, config.pi, config.prototype,
+        config.number_sample, config.weight_decay, config.lr, config.number_sample, config.batchsize, config.pi)
+
     os.makedirs(out_dir, exist_ok=True)
     print("The output dictionary is {}".format(out_dir))
 
@@ -76,9 +85,9 @@ def train():
 
     dataset.feature_dim = dataset.train_feature.shape[1]
     data_layer = FeatDataLayer(dataset.train_label.numpy(), dataset.train_feature.cpu().numpy(), config)
-    config.niter = int(dataset.ntrain / config.batchsize) * config.gen_nepoch
+    config.niter = int(dataset.ntrain / config.batchsize) * config.epochs
 
-    result_gzsl_soft = Result()
+    result = Result()
     sim = cosine_similarity(dataset.train_att, dataset.train_att)
     min_idx = np.argmin(sim.sum(-1))
     min = dataset.train_att[min_idx]
@@ -114,9 +123,11 @@ def train():
 
     flow = Flow(transform, base_dist).cuda()
 
-    sm = GSModule(vertices, int(config['semantic_vector_dim')).cuda()
+    sm = GSModule(vertices, int(config['semantic_vector_dim'])).cuda()
     print(flow)
-    optimizer = optim.Adam(list(flow.parameters()) + list(sm.parameters()), lr=config.lr, weight_decay=config.weight_decay)
+    optimizer = optim.Adam(list(flow.parameters()) + list(sm.parameters()), 
+                           lr=float(config.lr),
+                           weight_decay=float(config.weight_decay))
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, gamma=0.8, step_size=15)
 
     mse = nn.MSELoss()
@@ -133,6 +144,7 @@ def train():
         flow.zero_grad()
         sm.zero_grad()
 
+        loss = 0
         blobs = data_layer.forward()
         feat_data = blobs['data']  # image data
         labels_numpy = blobs['labels'].astype(int)  # class labels
@@ -151,26 +163,35 @@ def train():
         log_prob, ldj = flow.log_prob(X, sr)
         log_prob += ldj
         loss_flow = - log_prob.mean() * 2
-        with torch.no_grad():
-            sr = sm(torch.from_numpy(dataset.train_att).cuda())
-        centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label))
+        loss += loss_flow
 
-        loss = loss_flow + centralizing_loss
+        run.log({"loss_flow": loss_flow.item()})
         # z_, log_jac_det = flow(X, sr)
-
         # loss = torch.mean(z_**2) / 2 - torch.mean(log_jac_det) / 2048
 
-        loss.backward(retain_graph=True)
+        with torch.no_grad():
+            sr = sm(torch.from_numpy(dataset.train_att).cuda())
 
-        if config.prototype > 0.0:
+        if config.centralizing_loss > 0:
+            centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label))
+            loss += centralizing_loss
+            run.log({"loss_central": centralizing_loss.item()})
+
+            loss.backward(retain_graph=True)
+
+        if config.prototype > 0:
             with torch.no_grad():
                 sr = sm(torch.from_numpy(dataset.train_att).cuda())
             z = torch.zeros(dataset.ntrain_class, 2048).cuda()
             # x_ = flow.reverse_sample(z, sr)
             x_ = flow.generation(torch.cat((sr, visual_distribution.sample((sr.shape[0],))), dim=1))
             prototype_loss = config.prototype * mse(x_, x_mean)
-            prototype_loss.backward()
+            loss += prototype_loss
+            run.log({"loss_proto": prototype_loss.item()})
 
+        run.log({"loss": loss.item()})
+
+        loss.backward()
         optimizer.step()
         if it % iters == 0:
             lr_scheduler.step()
@@ -179,34 +200,54 @@ def train():
                                                                                    prototype_loss.item())
             log_print(log_text, log_dir)
 
-        if it % config.evl_interval == 0 and it > 2000:
+        # if it % config.evl_interval == 0 and it > 2000:
+        log_text = 'aaaa'
+        if True:
             flow.eval()
             sm.eval()
             gen_feat, gen_label = synthesize_feature(flow, sm, dataset, config)
 
-            train_X = torch.cat((dataset.train_feature, gen_feat), 0)
-            train_Y = torch.cat((dataset.train_label, gen_label + dataset.ntrain_class), 0)
+            # """ GZSL """
+            if config.gzsl:
+                train_X = torch.cat((dataset.train_feature, gen_feat), 0)
+                train_Y = torch.cat((dataset.train_label, gen_label + dataset.ntrain_class), 0)
 
-            """ GZSL"""
+                cls = classifier.CLASSIFIER(run, config, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
+                                            dataset.ntrain_class + dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, config.gzsl)
 
-            cls = classifier.CLASSIFIER(config, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
-                                        dataset.ntrain_class + dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, True)
+                result.update_gzsl(it, cls.acc_seen, cls.acc_unseen, cls.H)
+                # run.summary["Best Harmonic"] = result.best_acc
+                # run.summary["Best Acc Unseen"] = result.best_acc_U_T
+                # run.summary["Best Acc Seen"] = result.best_acc_S_T
 
-            result_gzsl_soft.update_gzsl(it, cls.acc_seen, cls.acc_unseen, cls.H)
+                log_print("GZSL Softmax:", log_dir)
+                log_print(f"U->T {cls.acc_unseen:.2f}  S->T {cls.acc_seen:.2f}  H {cls.H:.2f}\
+                    Best_H [{result.best_acc_U_T:.2f} {result.best_acc_S_T:.2f} {result.best_acc:.2f}\
+                        | Iter-{result.best_iter}]", log_dir)
 
-            log_print("GZSL Softmax:", log_dir)
-            log_print("U->T {:.2f}%  S->T {:.2f}%  H {:.2f}%  Best_H [{:.2f}% {:.2f}% {:.2f}% | Iter-{}]".format(
-                cls.acc_unseen, cls.acc_seen, cls.H, result_gzsl_soft.best_acc_U_T, result_gzsl_soft.best_acc_S_T,
-                result_gzsl_soft.best_acc, result_gzsl_soft.best_iter), log_dir)
+                if result.save_model:
+                    files2remove = glob.glob(out_dir + '/Best_model_GZSL_*')
+                    for _i in files2remove:
+                        os.remove(_i)
+                    save_model(it, flow, sm, config.manualSeed, log_text,
+                               f"{out_dir}/Best_model_GZSL_H_{result.best_acc:.2f}_S_{result.best_acc_S_T:.2f}_U_{result.best_acc_U_T:.2f}.tar")
+            # """ ZSL """
+            else:
+                train_X = gen_feat
+                train_Y = gen_label
+                cls = classifier.CLASSIFIER(config, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
+                                            dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, config.gzsl)
 
-            if result_gzsl_soft.save_model:
-                files2remove = glob.glob(out_dir + '/Best_model_GZSL_*')
-                for _i in files2remove:
-                    os.remove(_i)
-                save_model(it, flow, sm, config.manualSeed, log_text,
-                           out_dir + '/Best_model_GZSL_H_{:.2f}_S_{:.2f}_U_{:.2f}.tar'.format(result_gzsl_soft.best_acc,
-                                                                                              result_gzsl_soft.best_acc_S_T,
-                                                                                              result_gzsl_soft.best_acc_U_T))
+                result.update(it, cls.acc)
+                log_print("ZSL Softmax:", log_dir)
+                log_print(f"Best_Accuracy [{result.best_acc:.2f} | Iter-{result.best_iter}]", log_dir)
+
+                if result.save_model:
+                    files2remove = glob.glob(out_dir + '/Best_model_ZSL_*')
+                    for _i in files2remove:
+                        os.remove(_i)
+                    save_model(it, flow, sm, config.manualSeed, log_text,
+                               f"{out_dir}/Best_model_ZSL_Acc_{result.best_acc:.2f}_.tar")
 
             sm.train()
             flow.train()

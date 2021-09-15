@@ -4,6 +4,7 @@ save_text_features: 'data/CUB_200_2011/mat/text/'
 # mat_file_text: 'data/CUB_200_2011/mat/text/bert.mat'
 # mat_file_text: 'data/CUB_200_2011/mat/text/att_splits_ordered.mat'
 # mat_file_text: 'data/CUB_200_2011/mat/text/glove.840B.300d.mat'
-# glove_dir: /project/data/glove.840B.300d.txt # /project/data/image_net/train
-text_encoder:  bigbird #bert # glove #albert-base-v2 # manual #glove #albert #bart #albert  # prophet_net
+glove_dir: /project/data/glove.840B.300d.txt # /project/data/image_net/train
+text_encoder:  glove840B #bert # glove #albert-base-v2 # manual #glove #albert #bart #albert  # prophet_net
 dataset: cub2011 #manual_cub2011 #imagenet
+# glove_dir: 

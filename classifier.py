@@ -14,9 +14,10 @@ def weights_init(m):
 
 class CLASSIFIER:
     # train_Y is interger
-    def __init__(self, opt, _train_X, _train_Y, data_loader, test_seen_feature,test_unseen_feature, _nclass, _cuda, _lr=0.001, _beta1=0.5, _nepoch=20,
-                 _batch_size=100,  generalized=True, MCA=True):
-        self.train_X =  _train_X
+    def __init__(self, run, opt, _train_X, _train_Y, data_loader, test_seen_feature, test_unseen_feature,
+                 _nclass, _cuda, _lr=0.001, _beta1=0.5, _nepoch=20, _batch_size=100, generalized=True, MCA=True):
+        self.run = run
+        self.train_X = _train_X
         self.train_Y = _train_Y
         self.test_seen_feature = test_seen_feature
         self.test_seen_label = data_loader.test_seen_label
@@ -33,7 +34,7 @@ class CLASSIFIER:
         self.input_dim = _train_X.shape[1]
         self.cuda = _cuda
         self.MCA = MCA
-        self.model =  LINEAR_LOGSOFTMAX(self.input_dim, self.nclass)
+        self.model = LINEAR_LOGSOFTMAX(self.input_dim, self.nclass)
         self.model.apply(weights_init)
         self.criterion = nn.NLLLoss()
         self.opt = opt
@@ -74,7 +75,7 @@ class CLASSIFIER:
                 labelv = Variable(self.label)
                 output = self.model(inputv)
                 loss = self.criterion(output, labelv)
-                mean_loss += loss.item()
+                # mean_loss += loss.item()
                 loss.backward()
                 self.optimizer.step()
             acc = self.val(self.test_unseen_feature, self.test_unseen_label, self.unseenclasses)
@@ -101,14 +102,19 @@ class CLASSIFIER:
                 self.optimizer.step()
 
             acc_seen = self.val_gzsl(self.test_seen_feature, self.test_seen_label)
-            acc_unseen = self.val_gzsl(self.test_unseen_feature, self.test_unseen_label+self.ntrain_class)
-            H = 2*acc_seen*acc_unseen / (acc_seen+acc_unseen)
+            acc_unseen = self.val_gzsl(self.test_unseen_feature, self.test_unseen_label + self.ntrain_class)
+            H = 2 * acc_seen * acc_unseen / (acc_seen + acc_unseen)
+
+            self.run.log({'Harmonic Mean': H * 100,
+                          'Accuracy Unseen': acc_unseen * 100,
+                          'Accuracy Seen': acc_seen * 100})
+
             print('acc_seen=%.4f, acc_unseen=%.4f, h=%.4f' % (acc_seen, acc_unseen, H))
             if H > best_H:
                 best_seen = acc_seen
                 best_unseen = acc_unseen
                 best_H = H
-        return best_seen * 100, best_unseen * 100, best_H *100
+        return best_seen * 100, best_unseen * 100, best_H * 100
 
     def next_batch(self, batch_size):
         start = self.index_in_epoch
@@ -134,9 +140,9 @@ class CLASSIFIER:
             end = self.index_in_epoch
             X_new_part = self.train_X[start:end]
             Y_new_part = self.train_Y[start:end]
-            #print(start, end)
+            # print(start, end)
             if rest_num_examples > 0:
-                return torch.cat((X_rest_part, X_new_part), 0) , torch.cat((Y_rest_part, Y_new_part), 0)
+                return torch.cat((X_rest_part, X_new_part), 0), torch.cat((Y_rest_part, Y_new_part), 0)
             else:
                 return X_new_part, Y_new_part
         else:
@@ -145,14 +151,13 @@ class CLASSIFIER:
             # from index start to index end-1
             return self.train_X[start:end], self.train_Y[start:end]
 
-
     def val_gzsl(self, test_X, test_label):
         start = 0
         ntest = test_X.size()[0]
         predicted_label = torch.LongTensor(test_label.size())
         with torch.no_grad():
             for i in range(0, ntest, self.batch_size):
-                end = min(ntest, start+self.batch_size)
+                end = min(ntest, start + self.batch_size)
                 if self.cuda:
                     output = self.model(test_X[start:end].cuda())
                 else:
@@ -176,7 +181,7 @@ class CLASSIFIER:
         acc_per_class = 0
         for i in target_classes:
             idx = (test_label == i)
-            acc_per_class += torch.sum(test_label[idx]==predicted_label[idx]).float() / torch.sum(idx)
+            acc_per_class += torch.sum(test_label[idx] == predicted_label[idx]).float() / torch.sum(idx)
         acc_per_class /= target_classes.size(0)
         return acc_per_class
 
@@ -187,7 +192,7 @@ class CLASSIFIER:
         predicted_label = torch.LongTensor(test_label.size())
         with torch.no_grad():
             for i in range(0, ntest, self.batch_size):
-                end = min(ntest, start+self.batch_size)
+                end = min(ntest, start + self.batch_size)
                 if self.cuda:
                     output = self.model(test_X[start:end].cuda())
                 else:
@@ -205,7 +210,7 @@ class CLASSIFIER:
         acc_per_class = torch.FloatTensor(nclass).fill_(0)
         for i in range(nclass):
             idx = (test_label == i)
-            acc_per_class[i] = torch.sum(test_label[idx]==predicted_label[idx]).float() / torch.sum(idx)
+            acc_per_class[i] = torch.sum(test_label[idx] == predicted_label[idx]).float() / torch.sum(idx)
         return acc_per_class.mean()
 
 
@@ -214,6 +219,7 @@ class LINEAR_LOGSOFTMAX(nn.Module):
         super(LINEAR_LOGSOFTMAX, self).__init__()
         self.fc = nn.Linear(input_dim, nclass)
         self.logic = nn.LogSoftmax(dim=1)
+
     def forward(self, x):
         o = self.logic(self.fc(x))
         return o

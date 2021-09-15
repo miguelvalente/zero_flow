@@ -65,7 +65,7 @@ class ImageEncoder():
         self.targets = cub.targets
 
         visual_features = []
-        for img in tqdm(cub.img_paths[:10], desc=f"({self.config['split']}): Extracting Visual Features"):
+        for img in tqdm(cub.img_paths, desc=f"({self.config['split']}): Extracting Visual Features"):
             img = self.loader(img)
             img = self._encode(img)
             visual_features.append(img)

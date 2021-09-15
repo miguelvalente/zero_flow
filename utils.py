@@ -36,7 +36,6 @@ class Result(object):
             self.best_acc_S_T = acc_s
             self.save_model = True
 
-
 def sum_except_batch(x, num_dims=1):
     '''
     Sums all dimensions except the first.
@@ -82,19 +81,19 @@ def log_print(s, log):
 
 
 def synthesize_feature(flow, sm, dataset, opt):
-    gen_feat = torch.FloatTensor(dataset.ntest_class * opt.nSample, opt.X_dim)
+    gen_feat = torch.FloatTensor(dataset.ntest_class * opt.number_sample, opt.X_dim)
     gen_label = np.zeros([0])
     with torch.no_grad():
         for i in range(dataset.ntest_class):
-            text_feat = np.tile(dataset.test_att[i].astype('float32'), (opt.nSample, 1))
+            text_feat = np.tile(dataset.test_att[i].astype('float32'), (opt.number_sample, 1))
             text_feat = torch.from_numpy(text_feat).cuda()
             sr = sm(text_feat)
-            z = torch.randn(opt.nSample, 1024).cuda()
+            z = torch.randn(opt.number_sample, 1024).cuda()
             # z = z*z.norm(dim=-1, keepdim=True)
             G_sample = flow.generation(torch.cat((sr, z), dim=1))
             # G_sample = flow.reverse_sample(z, sr)
-            gen_feat[i * opt.nSample:(i + 1) * opt.nSample] = G_sample
-            gen_label = np.hstack((gen_label, np.ones([opt.nSample]) * i))
+            gen_feat[i * opt.number_sample:(i + 1) * opt.number_sample] = G_sample
+            gen_label = np.hstack((gen_label, np.ones([opt.number_sample]) * i))
     return gen_feat, torch.from_numpy(gen_label.astype(int))
 
 

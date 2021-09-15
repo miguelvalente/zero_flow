@@ -12,7 +12,6 @@ def map_label(label, classes):
 
 class DATA_LOADER(object):
     def __init__(self, opt):
-
         if opt.dataset in ['FLO', 'CUB']:
             self.read(opt)
         else:
@@ -27,7 +26,9 @@ class DATA_LOADER(object):
             self.tr_cls_centroid[i] = np.mean(self.train_feature[self.train_label == i].numpy(), axis=0)
 
     def read(self, opt):
-        matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/data.mat")
+        # matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/data.mat")
+
+        matcontent = sio.loadmat(opt.data_dir)
 
         train_att = matcontent['att_train']
         seen_pro = matcontent['seen_pro']

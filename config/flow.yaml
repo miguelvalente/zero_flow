@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 21
+  value: 600
 batchsize:
   desc: Size of each batch
   value: 256
@@ -19,15 +19,18 @@ permuter:
 loss_type:
   desc: flow loss from IZF or GSMFlow
   value: IZF
-wt_f_l:
+flow_loss:
   desc: weight for the flow loss
   value: 2
-wt_c_l:
+centralizing_loss:
   desc: weight for the centralizing loss
   value: 1
-wt_mmd_l:
+mdd_loss:
   desc: weight for the mmd loss
   value: 0.1
+prototype:
+  desc: weight of the prototype loss
+  value: 1
 dataroot:
   desc: path to dataset
   value: 'data/data'
@@ -64,57 +67,33 @@ manualSeed:
 semantic_vector_dim:
   desc: Dimension of semantic vectors
   value: 1024
-prototype:
-  desc: weight of the prototype loss
-  value: 1
 pi:
   desc: degree of the perturbation
   value: 0.05
 dropout:
   desc: probaility of droping dimension in he perturbation noise
   value: 0.0
-zsl:
+gzsl:
   desc: The paradigm of zero-shot learning
-  value: False
+  value: True
 clusters:
   desc:
   value: 3
-
-wt_p_l: 
-  desc: weigth of prototype loss 
-  value: 0
 net:
   desc: type olf MLP
   value: MLP #MLPR # MLP
 non_linearity:
   desc: non linear function for Affine Coupling
   value: leakyrelu #prelu # relu leakyrelu
-minmax_rescale:
-  desc: rescaling
-  value: True
 act_norm:
   desc: presence of actnorm
   value: True
 relative_positioning: 
   desc: relative positioning while training
   value: True
-model_name:
-  desc: model name of text encoder
-  value: albert-base-v2 # albert-xxlarge-v2
-summary_extraction_mode:
-  desc: type of extraction mode
-  value: mean_tokens
-aggregate_descriptions_method:
-  desc: another aggregation
-  value: mean_representations
-aggregate_long_text_splits_method:
-  desc: type of aggregation
-  value: mean
-overlap_window:
-  desc: how much overlap between articles
-  value: 3
-max_length:
-  desc: max length
-  value: 20
-
-   
+data_dir:
+  desc: data directory
+  value: "/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 
+dataset:
+  desc: the datset
+  value: CUB

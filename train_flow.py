@@ -208,7 +208,7 @@ for epoch in range(1, config['epochs']):
                     centralizing_loss_val = model.centralizing_loss(data, targets, cs, seen_id) * config['wt_c_l']
 
                 loss_flow_val = - log_prob.mean() * config['wt_f_l']
-                centralizing_loss_val = model.centralizing_loss(data_val, targets_val, cs, test_id) * config['wt_c_l']
+                # centralizing_loss_val = model.centralizing_loss(data_val, targets_val, cs, test_id) * config['wt_c_l']
                 # mmd_loss_val = model.mmd_loss(data_val, cu) * config['wt_mmd_l']
                 loss_val = loss_flow + centralizing_loss  # + mmd_loss
                 losses_val.append(loss_val.item())

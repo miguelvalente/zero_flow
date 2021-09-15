@@ -54,13 +54,16 @@ def load_txt_embeddings(emb_file):
 class WordEmbeddings:
     def __init__(self, config, device):
         self.config = config
-        self.emb_file = Path("project/data/glove.840B.300d.txt" #  Path(self.config['glove_dir'])
-
+        self.emb_file = Path(self.config['glove_dir'])
 
         self.emb, self.emb_dim = load_embeddings(self.emb_file)
 
+        #  uncomment to download
         # stanza.download('en')
         self.tokenizer = stanza.Pipeline('en', processors='tokenize')
+
+    def __call__(self, text):
+        return self.encode_long_text(text)
 
     def tokenize(self, text):
         doc = self.tokenizer(text)

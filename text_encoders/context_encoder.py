@@ -31,7 +31,7 @@ class ContextEncoder():
             self.text_encoder = BertEncoder(self.config, device=self.device)
         elif self.config['text_encoder'] == 'bigbird':
             self.text_encoder = BigBirdEncoder(self.config, device=self.device)
-        elif self.config['text_encoder'] == 'glove':
+        elif 'glove' in self.config['text_encoder']:
             self.text_encoder = WordEmbeddings(self.config, device=self.device)
         else:
             print(f"{IDENTITY} Encoding setting not found")
