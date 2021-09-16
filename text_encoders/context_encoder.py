@@ -48,7 +48,7 @@ class ContextEncoder():
             raise Exception
 
     def _encode_contexts_cub2011(self):
-        wiki_dir = 'project/data/CUBird_WikiArticles'
+        wiki_dir = 'data/CUBird_WikiArticles'
 
         file_list = next(os.walk(wiki_dir), (None, None, []))[2]
         file_list_id = [int(file.split('.')[0]) for file in file_list]
@@ -56,13 +56,8 @@ class ContextEncoder():
 
         articles = [open(f'{wiki_dir}/{file}').read() for file in file_list_ordered]
 
-        if self.config['text_encoder'] == 'glove':
-            save_path = f"{self.config['save_text_features']}{self.config['glove_dir'].split('/')[-1][:-4]}.mat"
-        else:
-            save_path = f"{self.config['save_text_features']}{self.config['text_encoder']}.mat"
-
         semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
-        contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
+        contexts = [(self.text_encoder(article.split("\n"))).type(torch.float32) for article in semantic]
 
         self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
 

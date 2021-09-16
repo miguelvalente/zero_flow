@@ -12,11 +12,11 @@ from sentence_transformers import SentenceTransformer
 class SentencePiece:
     def __init__(self, config, device):
         self.config = config
-        self.model = SentenceTransformer('all-mpnet-base-v2',device=device)
+        self.model = SentenceTransformer('all-mpnet-base-v2', device=device)
 
     def __call__(self, input_texts):
-        sentence_embedding = self.model.encode(input_texts)
-        print()
+        sentence_embedding = torch.tensor(self.model.encode(input_texts))
+        return sentence_embedding.mean(dim=0)
 
 class BigBirdEncoder:
     def __init__(self, config, device):
