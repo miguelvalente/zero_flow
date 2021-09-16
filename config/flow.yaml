@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 400
+  value: 200
 batchsize:
   desc: Size of each batch
   value: 256
@@ -18,7 +18,7 @@ permuter:
   value: LinearLU # manual reverse random manual
 loss_type:
   desc: flow loss from IZF or GSMFlow
-  value: IZF
+  value: IZFmean
 flow_loss:
   desc: weight for the flow loss
   value: 2
@@ -66,7 +66,7 @@ manualSeed:
   value: 6400
 semantic_vector_dim:
   desc: Dimension of semantic vectors
-  value: 1024
+  value: 0
 pi:
   desc: degree of the perturbation
   value: 0.05
@@ -93,7 +93,7 @@ relative_positioning:
   value: True
 data_dir:
   desc: data directory
-  value: "/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 
+  value: "data/CUB_200_2011/mat/resnet50d_sentence_sum.mat" # data/CUB_200_2011/mat/resnet50d_sentence.mat"  #/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 
 dataset:
   desc: the datset
   value: CUB

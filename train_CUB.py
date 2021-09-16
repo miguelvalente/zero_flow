@@ -33,13 +33,13 @@ os.environ['WANDB_MODE'] = 'offline'
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
                  config=r'config/flow.yaml')
 
-# with open('config/classifier.yaml', 'r') as c:
-#     wandb.config.update(yaml.safe_load(c))
-
 config = wandb.config
-# data = loadmat(config.data_dir)
-wandb.config['image_encoder'] = 'resnet50d'
-wandb.config['text_encoder'] = 'glove'
+with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
+    temp = yaml.safe_load(y)
+    wandb.config['image_encoder'] = temp['image_encoder']
+    wandb.config['text_encoder'] = temp['text_encoder']
+    del temp
+
 wandb.define_metric('Harmonic Mean', summary='max')
 wandb.define_metric('Accuracy Unseen', summary='max')
 wandb.define_metric('Accuracy Seen', summary='max')
@@ -87,7 +87,7 @@ def train():
     vertices = torch.from_numpy(np.stack((min, max, medi))).float().cuda()
 
     input_dim = 2048
-    context_dim = config.semantic_vector_dim
+    context_dim = dataset.train_att.shape[1] if config.semantic_vector_dim == 0 else config.semantic_vector_dim
     split_dim = input_dim - context_dim
 
     semantic_distribution = SemanticDistribution(torch.tensor(dataset.train_att).cuda(), torch.ones(context_dim).cuda())
@@ -107,7 +107,7 @@ def train():
 
     flow = Flow(transform, base_dist).cuda()
 
-    sm = GSModule(vertices, int(config.semantic_vector_dim)).cuda()
+    sm = GSModule(vertices, context_dim).cuda()
     print(flow)
     optimizer = optim.Adam(list(flow.parameters()) + list(sm.parameters()),
                            lr=float(config.lr),
@@ -144,14 +144,21 @@ def train():
         z = mask * z
         X = X + z
 
-        log_prob, ldj = flow.log_prob(X, sr)
-        log_prob += ldj
-        loss_flow = - log_prob.mean() * 2
-        loss += loss_flow
+        if 'IZF' in config.loss_type:
+            log_prob, ldj = flow.log_prob(X, sr)
+            log_prob += ldj
+            if 'mean' in config.loss_type:
+                loss_flow = - log_prob.mean() * config.flow_loss
+            elif 'l2' in config.loss_type:
+                loss_flow = - torch.norm(log_prob) * config.flow_loss
+        else:
+            log_prob, ldj = flow.log_prob(X, sr)
+            # z_, log_jac_det = flow(X, sr)
+            # loss = torch.mean(z_**2) / 2 - torch.mean(log_jac_det) / 2048
+            loss_flow = torch.mean(log_prob**2) / 2 - torch.mean(ldj) / 2048
 
+        loss += loss_flow
         run.log({"loss_flow": loss_flow.item()})
-        # z_, log_jac_det = flow(X, sr)
-        # loss = torch.mean(z_**2) / 2 - torch.mean(log_jac_det) / 2048
 
         with torch.no_grad():
             sr = sm(torch.from_numpy(dataset.train_att).cuda())
@@ -161,7 +168,7 @@ def train():
             loss += centralizing_loss
             run.log({"loss_central": centralizing_loss.item()})
 
-            loss.backward(retain_graph=True)
+            loss.backward()
 
         if config.prototype > 0:
             with torch.no_grad():
@@ -183,8 +190,7 @@ def train():
             log_text = f'Iter-[{it}/{config.niter}]; loss: {loss.item():.3f}'
             log_print(log_text, log_dir)
 
-        # if it % config.evl_interval == 0 and it > 2000:
-        if True:
+        if it % config.evl_interval == 0 and it >= 500:
             flow.eval()
             sm.eval()
             gen_feat, gen_label = synthesize_feature(flow, sm, dataset, config)

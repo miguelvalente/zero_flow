@@ -66,6 +66,6 @@ data_dic = {'att_train': 0,
             'test_seen_fea': np.squeeze(image_dic['features'][image_dic['test_seen_loc'] - 1]),
             'test_unseen_fea': np.squeeze(image_dic['features'][image_dic['test_unseen_loc'] - 1])}
 
-with open(f"{data_dic_path[:-3]}.yaml", "w") as f:
+with open(f"{data_dic_path[:-3]}yaml", "w") as f:
     yaml.dump(config, f)
 savemat(data_dic_path, data_dic)
