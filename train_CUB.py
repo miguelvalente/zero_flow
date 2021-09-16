@@ -1,5 +1,4 @@
 import argparse
-from scipy.io import loadmat, savemat
 import glob
 import json
 import math
@@ -16,6 +15,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
 import yaml
+from scipy.io import loadmat, savemat
 from sklearn.metrics.pairwise import cosine_similarity
 
 import classifier
@@ -29,7 +29,7 @@ from transform import Flow
 from utils import Result, log_print, save_model, synthesize_feature
 
 CUDA_LAUNCH_BLOCKING = 1
-os.environ['WANDB_MODE'] = 'online'
+os.environ['WANDB_MODE'] = 'offline'
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
                  config=r'config/flow.yaml')
 
@@ -43,16 +43,8 @@ wandb.config['text_encoder'] = 'glove'
 wandb.define_metric('Harmonic Mean', summary='max')
 wandb.define_metric('Accuracy Unseen', summary='max')
 wandb.define_metric('Accuracy Seen', summary='max')
-# image_embedding', default='res101', type=str)
-#   desc:
-#   value:, default='data/data', help='path to dataset')
-# class_embedding', default='att', type=str)
-#   desc:
-#   value:, default='data/data', help='path to dataset')
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-#  torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 if config.manualSeed is None:
     config.manualSeed = random.randint(1, 10000)
 print("Random Seed: ", config.manualSeed)
@@ -60,10 +52,7 @@ np.random.seed(config.manualSeed)
 random.seed(config.manualSeed)
 torch.manual_seed(config.manualSeed)
 torch.cuda.manual_seed_all(config.manualSeed)
-
 cudnn.benchmark = True
-# print('Running parameters:')
-# print(json.dumps(vars(config), indent=4, separators=(',', ': ')))
 
 
 def train():
@@ -98,7 +87,7 @@ def train():
     vertices = torch.from_numpy(np.stack((min, max, medi))).float().cuda()
 
     input_dim = 2048
-    context_dim = config['semantic_vector_dim']  # contexts[0].shape.numel()
+    context_dim = config.semantic_vector_dim
     split_dim = input_dim - context_dim
 
     semantic_distribution = SemanticDistribution(torch.tensor(dataset.train_att).cuda(), torch.ones(context_dim).cuda())
@@ -106,26 +95,21 @@ def train():
     base_dist = DoubleDistribution(visual_distribution, semantic_distribution, input_dim, context_dim)
 
     permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
-
     non_linearity = nn.PReLU(init=0.01)
-
-    hidden_dims = [input_dim // 2]
+    hidden_dims = [input_dim // 2] * 2
 
     transform = []
     for index in range(5):
         if True:
             transform.append(ActNormBijection(input_dim, data_dep_init=True))
         transform.append(permuter(input_dim))
-        transform.append(AffineCoupling(
-            input_dim,
-            split_dim,
-            context_dim=context_dim, hidden_dims=hidden_dims, non_linearity=non_linearity, net='MLP'))
+        transform.append(AffineCoupling(input_dim, hidden_dims, non_linearity=non_linearity))
 
     flow = Flow(transform, base_dist).cuda()
 
-    sm = GSModule(vertices, int(config['semantic_vector_dim'])).cuda()
+    sm = GSModule(vertices, int(config.semantic_vector_dim)).cuda()
     print(flow)
-    optimizer = optim.Adam(list(flow.parameters()) + list(sm.parameters()), 
+    optimizer = optim.Adam(list(flow.parameters()) + list(sm.parameters()),
                            lr=float(config.lr),
                            weight_decay=float(config.weight_decay))
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, gamma=0.8, step_size=15)
@@ -196,12 +180,10 @@ def train():
         if it % iters == 0:
             lr_scheduler.step()
         if it % config.disp_interval == 0 and it:
-            log_text = 'Iter-[{}/{}]; loss: {:.3f}; prototype_loss:{:.3f};'.format(it, config.niter, loss.item(),
-                                                                                   prototype_loss.item())
+            log_text = f'Iter-[{it}/{config.niter}]; loss: {loss.item():.3f}'
             log_print(log_text, log_dir)
 
         # if it % config.evl_interval == 0 and it > 2000:
-        log_text = 'aaaa'
         if True:
             flow.eval()
             sm.eval()
@@ -216,14 +198,11 @@ def train():
                                             dataset.ntrain_class + dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, config.gzsl)
 
                 result.update_gzsl(it, cls.acc_seen, cls.acc_unseen, cls.H)
-                # run.summary["Best Harmonic"] = result.best_acc
-                # run.summary["Best Acc Unseen"] = result.best_acc_U_T
-                # run.summary["Best Acc Seen"] = result.best_acc_S_T
 
                 log_print("GZSL Softmax:", log_dir)
-                log_print(f"U->T {cls.acc_unseen:.2f}  S->T {cls.acc_seen:.2f}  H {cls.H:.2f}\
-                    Best_H [{result.best_acc_U_T:.2f} {result.best_acc_S_T:.2f} {result.best_acc:.2f}\
-                        | Iter-{result.best_iter}]", log_dir)
+                log_print(f"U->T {cls.acc_unseen:.2f}  S->T {cls.acc_seen:.2f}  H {cls.H:.2f}"
+                          f" Best_H [{result.best_acc_U_T:.2f} {result.best_acc_S_T:.2f} {result.best_acc:.2f}]"
+                          f"| Iter-{result.best_iter}]", log_dir)
 
                 if result.save_model:
                     files2remove = glob.glob(out_dir + '/Best_model_GZSL_*')

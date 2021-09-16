@@ -79,6 +79,9 @@ class CLASSIFIER:
                 loss.backward()
                 self.optimizer.step()
             acc = self.val(self.test_unseen_feature, self.test_unseen_label, self.unseenclasses)
+
+            self.run.log({'Accuracy Unseen': acc * 100})
+
             if acc > best_acc:
                 best_acc = acc
         return best_acc * 100

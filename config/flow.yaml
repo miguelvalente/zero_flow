@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 600
+  value: 400
 batchsize:
   desc: Size of each batch
   value: 256
@@ -30,7 +30,7 @@ mdd_loss:
   value: 0.1
 prototype:
   desc: weight of the prototype loss
-  value: 1
+  value: 0
 dataroot:
   desc: path to dataset
   value: 'data/data'
