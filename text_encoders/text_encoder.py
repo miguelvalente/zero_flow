@@ -7,7 +7,16 @@ from transformers import (AlbertTokenizer, AlbertModel,
                           BigBirdModel, BigBirdTokenizer)
 import utils
 from text_encoders.text_encoder_utils import split_with_overlap
+from sentence_transformers import SentenceTransformer
 
+class SentencePiece:
+    def __init__(self, config, device):
+        self.config = config
+        self.model = SentenceTransformer('all-mpnet-base-v2',device=device)
+
+    def __call__(self, input_texts):
+        sentence_embedding = self.model.encode(input_texts)
+        print()
 
 class BigBirdEncoder:
     def __init__(self, config, device):

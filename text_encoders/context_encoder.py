@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from text_encoders.text_encoder import (AlbertEncoder, BartEncoder,
                                         BertEncoder, BigBirdEncoder,
-                                        ProphetNet)
+                                        ProphetNet, SentencePiece)
 from text_encoders.word_embeddings import WordEmbeddings
 
 IDENTITY = 'Context Encoder| '
@@ -31,6 +31,8 @@ class ContextEncoder():
             self.text_encoder = BertEncoder(self.config, device=self.device)
         elif self.config['text_encoder'] == 'bigbird':
             self.text_encoder = BigBirdEncoder(self.config, device=self.device)
+        elif self.config['text_encoder'] == 'sentence':
+            self.text_encoder = SentencePiece(self.config, device=self.device)
         elif 'glove' in self.config['text_encoder']:
             self.text_encoder = WordEmbeddings(self.config, device=self.device)
         else:
@@ -46,7 +48,7 @@ class ContextEncoder():
             raise Exception
 
     def _encode_contexts_cub2011(self):
-        wiki_dir = '/project/data/Raw_Wiki_Articles/CUBird_WikiArticles'
+        wiki_dir = 'project/data/CUBird_WikiArticles'
 
         file_list = next(os.walk(wiki_dir), (None, None, []))[2]
         file_list_id = [int(file.split('.')[0]) for file in file_list]
