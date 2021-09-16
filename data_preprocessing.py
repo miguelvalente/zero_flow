@@ -64,7 +64,8 @@ data_dic = {'att_train': 0,
             'unseen_pro': np.squeeze(semantic_dic['features'][image_dic['unseen_id'] - 1]),
             'train_fea': np.squeeze(image_dic['features'][image_dic['train_loc'] - 1]),
             'test_seen_fea': np.squeeze(image_dic['features'][image_dic['test_seen_loc'] - 1]),
-            'test_unseen_fea': np.squeeze(image_dic['features'][image_dic['test_unseen_loc'] - 1]),
-            'processing_config': config}
+            'test_unseen_fea': np.squeeze(image_dic['features'][image_dic['test_unseen_loc'] - 1])}
 
+with open(f"{data_dic_path[:-3]}.yaml", "w") as f:
+    yaml.dump(config, f)
 savemat(data_dic_path, data_dic)
