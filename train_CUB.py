@@ -29,7 +29,7 @@ from transform import Flow
 from utils import Result, log_print, save_model, synthesize_feature
 
 CUDA_LAUNCH_BLOCKING = 1
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 run = wandb.init(project='zero_flow_CUB', entity='mvalente',
                  config=r'config/flow.yaml')
 
@@ -167,8 +167,6 @@ def train():
             centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label))
             loss += centralizing_loss
             run.log({"loss_central": centralizing_loss.item()})
-
-            loss.backward()
 
         if config.prototype > 0:
             with torch.no_grad():

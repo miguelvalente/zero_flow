@@ -13,8 +13,12 @@ from text_encoders.text_encoder import (AlbertEncoder, BartEncoder,
                                         BertEncoder, BigBirdEncoder,
                                         ProphetNet, SentencePiece)
 from text_encoders.word_embeddings import WordEmbeddings
+# import spacy
+# import unidecode
+# from word2number import w2n
+# import contractions
 
-IDENTITY = 'Context Encoder| '
+IDENTITY = '  Context Encoder ~| '
 
 class ContextEncoder():
     def __init__(self, config, device='cpu'):
@@ -47,6 +51,15 @@ class ContextEncoder():
             print(f"{IDENTITY} Dataset not found")
             raise Exception
 
+    def _pre_process_articles(self, articles):
+        clean_art = []
+
+        for art in articles:
+            temp = []
+            temp.append([sentence for sentence in art.split('\n') if sentence if len(sentence) >= 10])
+            clean_art.append(temp[:50])
+        return clean_art
+
     def _encode_contexts_cub2011(self):
         wiki_dir = 'data/CUBird_WikiArticles'
 
@@ -55,9 +68,11 @@ class ContextEncoder():
         file_list_ordered = [x for _, x in sorted(zip(file_list_id, file_list))]
 
         articles = [open(f'{wiki_dir}/{file}').read() for file in file_list_ordered]
+        if self.config['preprocess_text']:
+            articles = self._pre_process_articles(articles)
 
-        semantic = tqdm(articles, desc='Encoding All Semantic Descriptions CUB2011')
-        contexts = [(self.text_encoder(article.split("\n"))).type(torch.float32) for article in semantic]
+        semantic = tqdm(articles, desc=f'{IDENTITY} Encoding All Semantic Descriptions CUB2011')
+        contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
 
         self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
 

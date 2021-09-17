@@ -16,7 +16,10 @@ class SentencePiece:
 
     def __call__(self, input_texts):
         sentence_embedding = torch.tensor(self.model.encode(input_texts))
-        return sentence_embedding.sum(dim=0)
+        if isinstance(input_texts, list):
+            return sentence_embedding.mean(dim=0)
+        else:
+            return sentence_embedding
 
 
 class BigBirdEncoder:

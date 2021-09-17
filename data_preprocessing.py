@@ -17,7 +17,7 @@ from distributions import DoubleDistribution, SemanticDistribution
 from image_encoder.image_encoder import ImageEncoder
 from text_encoders.context_encoder import ContextEncoder
 
-IDENTITY = 'Data Preprocess | '
+IDENTITY = '  Data Preprocess ~| '
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
@@ -31,11 +31,11 @@ image_mat_path = f"data/CUB_200_2011/mat/visual/{config['image_encoder']}.mat"
 text_mat_path = f"data/CUB_200_2011/mat/text/{config['text_encoder']}.mat"
 data_dic_path = f"data/CUB_200_2011/mat/{config['image_encoder']}_{config['text_encoder']}.mat"
 if os.path.exists(data_dic_path):
-    print(f'\n  {IDENTITY} {data_dic_path} already exists.')
+    print(f'\n{IDENTITY} {data_dic_path} already exists.')
     sys.exit()
 
 if os.path.exists(image_mat_path):
-    print(f'\n  {IDENTITY} .mat exists. Loading {image_mat_path} instead of encoding images.')
+    print(f'\n{IDENTITY} .mat exists. Loading {image_mat_path} instead of encoding images.')
     image_dic = loadmat(image_mat_path)
 else:
     image_encoder = ImageEncoder(config)
@@ -49,7 +49,7 @@ else:
     savemat(image_mat_path, image_dic)
 
 if os.path.exists(text_mat_path):
-    print(f'\n  {IDENTITY} .mat exists. Loading {text_mat_path} instead of encoding text.')
+    print(f'\n{IDENTITY} .mat exists. Loading {text_mat_path} instead of encoding text.')
     semantic_dic = loadmat(text_mat_path)
 else:
     context_encoder = ContextEncoder(config, device=device)
@@ -68,4 +68,5 @@ data_dic = {'att_train': 0,
 
 with open(f"{data_dic_path[:-3]}yaml", "w") as f:
     yaml.dump(config, f)
+print(f'\n{IDENTITY} .mat file saved to:  {data_dic_path}')
 savemat(data_dic_path, data_dic)

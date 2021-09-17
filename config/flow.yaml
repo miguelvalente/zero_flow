@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 200
+  value: 100
 batchsize:
   desc: Size of each batch
   value: 256
@@ -66,7 +66,7 @@ manualSeed:
   value: 6400
 semantic_vector_dim:
   desc: Dimension of semantic vectors
-  value: 0
+  value: 1024
 pi:
   desc: degree of the perturbation
   value: 0.05
@@ -93,7 +93,8 @@ relative_positioning:
   value: True
 data_dir:
   desc: data directory
-  value: "data/CUB_200_2011/mat/resnet50d_sentence_sum.mat" # data/CUB_200_2011/mat/resnet50d_sentence.mat"  #/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 
+  value: 'data/CUB_200_2011/mat/resnet50d_sentence_len_50.mat' # 'data/CUB_200_2011/mat/resnet50d_sentence_len.mat' # "  #/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 
+  # value: 'data/CUB_200_2011/mat/resnet50d_sentence_len.mat' # "  #/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 
 dataset:
   desc: the datset
   value: CUB

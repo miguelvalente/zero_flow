@@ -88,7 +88,7 @@ def synthesize_feature(flow, sm, dataset, opt):
             text_feat = np.tile(dataset.test_att[i].astype('float32'), (opt.number_sample, 1))
             text_feat = torch.from_numpy(text_feat).cuda()
             sr = sm(text_feat)
-            z = torch.randn(opt.number_sample, 1024).cuda()
+            z = torch.randn(opt.number_sample, 2048 - sr.shape[1]).cuda()
             # z = z*z.norm(dim=-1, keepdim=True)
             G_sample = flow.generation(torch.cat((sr, z), dim=1))
             # G_sample = flow.reverse_sample(z, sr)
