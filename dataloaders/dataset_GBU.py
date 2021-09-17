@@ -12,7 +12,7 @@ def map_label(label, classes):
 
 class DATA_LOADER(object):
     def __init__(self, opt):
-        if opt.dataset in ['FLO', 'CUB']:
+        if opt.dataset in ['FLO', 'cub2011']:
             self.read(opt)
         else:
             self.read_matdataset(opt)
@@ -55,7 +55,7 @@ class DATA_LOADER(object):
         self.test_seen_feature = torch.from_numpy(test_seen_fea).float()
         self.test_unseen_feature = torch.from_numpy(test_unseen_fea).float()
 
-        matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/label.mat")
+        matcontent = sio.loadmat('data/CUB_200_2011/mat/label.mat')
 
         train_idx = matcontent['train_idx'] - 1
         train_label = matcontent['train_label_new']

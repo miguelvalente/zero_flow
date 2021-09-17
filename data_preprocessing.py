@@ -29,7 +29,7 @@ with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml
 
 image_mat_path = f"data/CUB_200_2011/mat/visual/{config['image_encoder']}.mat"
 text_mat_path = f"data/CUB_200_2011/mat/text/{config['text_encoder']}.mat"
-data_dic_path = f"data/CUB_200_2011/mat/{config['image_encoder']}_{config['text_encoder']}.mat"
+data_dic_path = f"data/CUB_200_2011/mat/{config['image_encoder']}_{config['split']}_{config['text_encoder']}.mat"
 if os.path.exists(data_dic_path):
     print(f'\n{IDENTITY} {data_dic_path} already exists.')
     sys.exit()

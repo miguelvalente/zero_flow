@@ -38,6 +38,8 @@ with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
     temp = yaml.safe_load(y)
     wandb.config['image_encoder'] = temp['image_encoder']
     wandb.config['text_encoder'] = temp['text_encoder']
+    wandb.config['split'] = temp['split']
+    wandb.config['dataset'] = temp['dataset']
     del temp
 
 wandb.define_metric('Harmonic Mean', summary='max')

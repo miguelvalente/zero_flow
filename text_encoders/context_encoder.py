@@ -55,9 +55,8 @@ class ContextEncoder():
         clean_art = []
 
         for art in articles:
-            temp = []
-            temp.append([sentence for sentence in art.split('\n') if sentence if len(sentence) >= 10])
-            clean_art.append(temp[:50])
+            clean_art.append([sentence for sentence in art.split('\n') if sentence if len(sentence) >= 10])
+
         return clean_art
 
     def _encode_contexts_cub2011(self):
@@ -72,7 +71,8 @@ class ContextEncoder():
             articles = self._pre_process_articles(articles)
 
         semantic = tqdm(articles, desc=f'{IDENTITY} Encoding All Semantic Descriptions CUB2011')
-        contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
+        with torch.no_grad():
+            contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
 
         self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
 
