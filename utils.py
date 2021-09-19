@@ -80,14 +80,17 @@ def log_print(s, log):
         f.write(s + '\n')
 
 
-def synthesize_feature(flow, sm, dataset, opt):
+def synthesize_feature(flow, dataset, opt, sm=None):
     gen_feat = torch.FloatTensor(dataset.ntest_class * opt.number_sample, opt.X_dim)
     gen_label = np.zeros([0])
     with torch.no_grad():
         for i in range(dataset.ntest_class):
             text_feat = np.tile(dataset.test_att[i].astype('float32'), (opt.number_sample, 1))
             text_feat = torch.from_numpy(text_feat).cuda()
-            sr = sm(text_feat)
+            if sm:
+                sr = sm(text_feat)
+            else:
+                sr = text_feat
             z = torch.randn(opt.number_sample, 2048 - sr.shape[1]).cuda()
             # z = z*z.norm(dim=-1, keepdim=True)
             G_sample = flow.generation(torch.cat((sr, z), dim=1))

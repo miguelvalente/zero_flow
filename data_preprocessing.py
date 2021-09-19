@@ -29,7 +29,7 @@ with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml
 
 image_mat_path = f"data/CUB_200_2011/mat/visual/{config['image_encoder']}.mat"
 text_mat_path = f"data/CUB_200_2011/mat/text/{config['text_encoder']}.mat"
-data_dic_path = f"data/CUB_200_2011/mat/{config['image_encoder']}_{config['split']}_{config['text_encoder']}.mat"
+data_dic_path = f"data/CUB_200_2011/mat/{config['image_encoder']}_{config['split'][:-4]}_{config['text_encoder']}.mat"
 if os.path.exists(data_dic_path):
     print(f'\n{IDENTITY} {data_dic_path} already exists.')
     sys.exit()
@@ -69,4 +69,4 @@ data_dic = {'att_train': 0,
 with open(f"{data_dic_path[:-3]}yaml", "w") as f:
     yaml.dump(config, f)
 print(f'\n{IDENTITY} .mat file saved to:  {data_dic_path}')
-savemat(data_dic_path, data_dic)
+# savemat(data_dic_path, data_dic)

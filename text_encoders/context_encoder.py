@@ -1,6 +1,8 @@
 import csv
+import re
 import os
 import pickle
+import string
 
 import numpy as np
 import scipy.io
@@ -13,6 +15,8 @@ from text_encoders.text_encoder import (AlbertEncoder, BartEncoder,
                                         BertEncoder, BigBirdEncoder,
                                         ProphetNet, SentencePiece)
 from text_encoders.word_embeddings import WordEmbeddings
+import nltk
+from nltk.corpus import stopwords
 # import spacy
 # import unidecode
 # from word2number import w2n
@@ -51,13 +55,19 @@ class ContextEncoder():
             print(f"{IDENTITY} Dataset not found")
             raise Exception
 
-    def _pre_process_articles(self, articles):
-        clean_art = []
+    def _pre_process_articles(self, _articles):
+        articles = [re.sub(r'\d+', '', art.lower()).translate(str.maketrans('', '', string.punctuation))
+                    for art in _articles]
 
-        for art in articles:
-            clean_art.append([sentence for sentence in art.split('\n') if sentence if len(sentence) >= 10])
+        # clean_articles = []
+        # for art in articles:
+        #     clean_articles.append(" ".join([word for word in art.split() if word not in stop_words]))
 
-        return clean_art
+        # clean_art = []
+        # for art in articles:
+        #     clean_art.append([sentence for sentence in art.split('\n') if sentence if len(sentence) >= 9])
+
+        return articles
 
     def _encode_contexts_cub2011(self):
         wiki_dir = 'data/CUBird_WikiArticles'

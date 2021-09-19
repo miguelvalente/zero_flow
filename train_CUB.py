@@ -89,7 +89,10 @@ def train():
     vertices = torch.from_numpy(np.stack((min, max, medi))).float().cuda()
 
     input_dim = 2048
-    context_dim = dataset.train_att.shape[1] if config.semantic_vector_dim == 0 else config.semantic_vector_dim
+    if config.relative_positioning:
+        context_dim = dataset.train_att.shape[1] if config.semantic_vector_dim == 0 else config.semantic_vector_dim
+    else:
+        context_dim = dataset.train_att.shape[1]
     split_dim = input_dim - context_dim
 
     semantic_distribution = SemanticDistribution(torch.tensor(dataset.train_att).cuda(), torch.ones(context_dim).cuda())
@@ -109,9 +112,14 @@ def train():
 
     flow = Flow(transform, base_dist).cuda()
 
-    sm = GSModule(vertices, context_dim).cuda()
+    if config.relative_positioning:
+        sm = GSModule(vertices, context_dim).cuda()
+        parameters = list(flow.parameters()) + list(sm.parameters())
+    else:
+        parameters = list(flow.parameters())
     print(flow)
-    optimizer = optim.Adam(list(flow.parameters()) + list(sm.parameters()),
+
+    optimizer = optim.Adam(parameters,
                            lr=float(config.lr),
                            weight_decay=float(config.weight_decay))
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, gamma=0.8, step_size=15)
@@ -128,7 +136,8 @@ def train():
     iters = math.ceil(dataset.ntrain / config.batchsize)
     for it in tqdm.tqdm(range(start_step, config.niter + 1), desc='Iterations'):
         flow.zero_grad()
-        sm.zero_grad()
+        if config.relative_positioning:
+            sm.zero_grad()
 
         loss = 0
         blobs = data_layer.forward()
@@ -136,11 +145,18 @@ def train():
         labels_numpy = blobs['labels'].astype(int)  # class labels
         labels = torch.from_numpy(labels_numpy.astype('int')).cuda()
 
-        C = np.array([dataset.train_att[i, :] for i in labels])
-        C = torch.from_numpy(C.astype('float32')).cuda()
+        if config.relative_positioning:
+            C = np.array([dataset.train_att[i, :] for i in labels])
+            C = torch.from_numpy(C.astype('float32')).cuda()
+        else:
+            C = torch.stack([semantic_distribution.sample(num_samples=1, n_points=1, context=l).reshape(1, -1) for l in labels])
+
         X = torch.from_numpy(feat_data).cuda()
 
-        sr = sm(C)
+        if config.relative_positioning:
+            sr = sm(C)
+        else:
+            sr = C
         z = config.pi * torch.randn(config.batchsize, 2048).cuda()
         mask = torch.cuda.FloatTensor(2048).uniform_() > config.dropout
         z = mask * z
@@ -162,8 +178,11 @@ def train():
         loss += loss_flow
         run.log({"loss_flow": loss_flow.item()})
 
-        with torch.no_grad():
-            sr = sm(torch.from_numpy(dataset.train_att).cuda())
+        if config.relative_positioning:
+            with torch.no_grad():
+                sr = sm(torch.from_numpy(dataset.train_att).cuda())
+        else:
+            sr = torch.from_numpy(dataset.train_att).cuda()
 
         if config.centralizing_loss > 0:
             centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label))
@@ -171,10 +190,12 @@ def train():
             run.log({"loss_central": centralizing_loss.item()})
 
         if config.prototype > 0:
-            with torch.no_grad():
-                sr = sm(torch.from_numpy(dataset.train_att).cuda())
-            z = torch.zeros(dataset.ntrain_class, 2048).cuda()
-            # x_ = flow.reverse_sample(z, sr)
+            if config.relative_positioning:
+                with torch.no_grad():
+                    sr = sm(torch.from_numpy(dataset.train_att).cuda())
+            else:
+                sr = torch.from_numpy(dataset.train_att).cuda()
+
             x_ = flow.generation(torch.cat((sr, visual_distribution.sample((sr.shape[0],))), dim=1))
             prototype_loss = config.prototype * mse(x_, x_mean)
             loss += prototype_loss
@@ -192,8 +213,11 @@ def train():
 
         if it % config.evl_interval == 0 and it >= 500:
             flow.eval()
-            sm.eval()
-            gen_feat, gen_label = synthesize_feature(flow, sm, dataset, config)
+            if config.relative_positioning:
+                sm.eval()
+                gen_feat, gen_label = synthesize_feature(flow, dataset, config, sm)
+            else:
+                gen_feat, gen_label = synthesize_feature(flow, dataset, config)
 
             # """ GZSL """
             if config.gzsl:
@@ -234,11 +258,17 @@ def train():
                     save_model(it, flow, sm, config.manualSeed, log_text,
                                f"{out_dir}/Best_model_ZSL_Acc_{result.best_acc:.2f}_.tar")
 
-            sm.train()
             flow.train()
-            if it % config.save_interval == 0 and it:
-                save_model(it, flow, sm, config.manualSeed, log_text,
-                           out_dir + '/Iter_{:d}.tar'.format(it))
+            if config.relative_positioning:
+                sm.train()
+                if it % config.save_interval == 0 and it:
+                    save_model(it, flow, sm, config.manualSeed, log_text,
+                               out_dir + '/Iter_{:d}.tar'.format(it))
+                    print('Save model to ' + out_dir + '/Iter_{:d}.tar'.format(it))
+            else:
+                if it % config.save_interval == 0 and it:
+                    save_model(it, flow, 0, config.manualSeed, log_text,
+                               out_dir + '/Iter_{:d}.tar'.format(it))
                 print('Save model to ' + out_dir + '/Iter_{:d}.tar'.format(it))
 
 class LinearModule(nn.Module):

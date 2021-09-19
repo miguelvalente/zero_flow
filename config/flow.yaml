@@ -93,7 +93,9 @@ relative_positioning:
   value: True
 data_dir:
   desc: data directory
-  value: 'data/CUB_200_2011/mat/resnet50d_hard_split.txt_sentence_len.mat' #'data/CUB_200_2011/hard_split.txt'
+  value: 'data/CUB_200_2011/mat/resnet50d_proposed_split.txt_sentence_clean_whole.mat'
+  # data/CUB_200_2011/mat/resnet50d_proposed_split.txt_sentence_len_clean.mat'
+  # 'data/CUB_200_2011/mat/resnet50d_hard_split.txt_sentence_len.mat' #'data/CUB_200_2011/hard_split.txt'
   # value: 'data/CUB_200_2011/mat/resnet50d_albert.mat'
   # value: 'data/CUB_200_2011/mat/resnet50d_sentence_len_50.mat' # 'data/CUB_200_2011/mat/resnet50d_sentence_len.mat' # "  #/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 
   # value: 'data/CUB_200_2011/mat/resnet50d_sentence_len.mat' # "  #/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 

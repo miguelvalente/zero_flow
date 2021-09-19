@@ -5,5 +5,5 @@ label_mat: a
 dataset: CUB
 # mat_file_visual: 'data/CUB_200_2011/mat/visual/resnet50d.mat'
 # mat_file_visual: 'data/CUB_200_2011/mat/visual/res101_ordered.mat'
-split: easy_split.txt #proposed_split.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
+split: proposed_split.txt #proposed_split.txt #zsl_split_20 #easy_CUB2011 hard_CUB2011
 image_encoder: resnet50d # efficientnet_b2
