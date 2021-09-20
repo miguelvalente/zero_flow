@@ -35,6 +35,7 @@ class DATA_LOADER(object):
         attribute = matcontent['attribute']
         unseen_pro = matcontent['unseen_pro']
         self.attribute = torch.from_numpy(attribute).float()
+        self.train_att_sampled = matcontent['att_train'].astype(np.float32)
         self.train_att = seen_pro.astype(np.float32)
         self.test_att = unseen_pro.astype(np.float32)
 
@@ -42,14 +43,26 @@ class DATA_LOADER(object):
         test_seen_fea = matcontent['test_seen_fea']
         test_unseen_fea = matcontent['test_unseen_fea']
 
-        scaler = preprocessing.MinMaxScaler()
-        _train_feature = scaler.fit_transform(train_fea)
-        _test_seen_feature = scaler.transform(test_seen_fea)
-        _test_unseen_feature = scaler.transform(test_unseen_fea)
-        mx = _train_feature.max()
-        train_fea = train_fea * (1 / mx)
-        test_seen_fea = test_seen_fea * (1 / mx)
-        test_unseen_fea = test_unseen_fea * (1 / mx)
+        # Image Features Normalization
+        min_max_scaler = preprocessing.MinMaxScaler().fit(train_fea)
+        train_fea = min_max_scaler.transform(train_fea)
+        test_seen_feature = min_max_scaler .transform(test_seen_fea)
+        test_unseen_feature = min_max_scaler .transform(test_unseen_fea)
+
+        # Semantic Features Normalization
+        # min_max_scaler = preprocessing.MinMaxScaler().fit(self.train_att)
+        # # std_scaler = preprocessing.StandardScaler().fit(self.train_att)
+        # self.train_att = min_max_scaler .transform(self.train_att)
+        # self.test_att = min_max_scaler.transform(self.test_att)
+
+        # scaler = preprocessing.MinMaxScaler()
+        # _train_feature = scaler.fit_transform(train_fea)
+        # _test_seen_feature = scaler.transform(test_seen_fea)
+        # _test_unseen_feature = scaler.transform(test_unseen_fea)
+        # mx = _train_feature.max()
+        # train_fea = train_fea * (1 / mx)
+        # test_seen_fea = test_seen_fea * (1 / mx)
+        # test_unseen_fea = test_unseen_fea * (1 / mx)
 
         self.train_feature = torch.from_numpy(train_fea).float()
         self.test_seen_feature = torch.from_numpy(test_seen_fea).float()

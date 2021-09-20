@@ -147,16 +147,18 @@ def train():
 
         if config.relative_positioning:
             C = np.array([dataset.train_att[i, :] for i in labels])
+            # C = np.array([dataset.train_att_sampled[i] for i in blobs['idx']])
             C = torch.from_numpy(C.astype('float32')).cuda()
         else:
-            C = torch.stack([semantic_distribution.sample(num_samples=1, n_points=1, context=l).reshape(1, -1) for l in labels])
+            C = np.array([dataset.train_att_sampled[i] for i in blobs['idx']])
+            C = torch.from_numpy(C.astype('float32')).cuda()
 
         X = torch.from_numpy(feat_data).cuda()
 
         if config.relative_positioning:
             sr = sm(C)
         else:
-            sr = C
+            sr = labels
         z = config.pi * torch.randn(config.batchsize, 2048).cuda()
         mask = torch.cuda.FloatTensor(2048).uniform_() > config.dropout
         z = mask * z
@@ -165,10 +167,7 @@ def train():
         if 'IZF' in config.loss_type:
             log_prob, ldj = flow.log_prob(X, sr)
             log_prob += ldj
-            if 'mean' in config.loss_type:
-                loss_flow = - log_prob.mean() * config.flow_loss
-            elif 'l2' in config.loss_type:
-                loss_flow = - torch.norm(log_prob) * config.flow_loss
+            loss_flow = - log_prob.mean() * config.flow_loss
         else:
             log_prob, ldj = flow.log_prob(X, sr)
             # z_, log_jac_det = flow(X, sr)

@@ -28,8 +28,9 @@ with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml
 
 
 image_mat_path = f"data/CUB_200_2011/mat/visual/{config['image_encoder']}.mat"
-text_mat_path = f"data/CUB_200_2011/mat/text/{config['text_encoder']}.mat"
-data_dic_path = f"data/CUB_200_2011/mat/{config['image_encoder']}_{config['split'][:-4]}_{config['text_encoder']}.mat"
+text_mat_path = f"data/CUB_200_2011/mat/text/{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
+data_dic_path = f"data/CUB_200_2011/mat/{config['image_encoder']}_{config['split'][:-4]}_{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
+
 if os.path.exists(data_dic_path):
     print(f'\n{IDENTITY} {data_dic_path} already exists.')
     sys.exit()
@@ -53,12 +54,22 @@ if os.path.exists(text_mat_path):
     semantic_dic = loadmat(text_mat_path)
 else:
     context_encoder = ContextEncoder(config, device=device)
-    semantic_dic = {'features': context_encoder.attributes,
-                    'text_config': text_config}
+    if config['semantic_sampling']:
+        label = loadmat('data/CUB_200_2011/mat/label.mat')
+        semantic_distribution = SemanticDistribution(torch.tensor(context_encoder.attributes), torch.ones(context_encoder.attributes.shape[1]))
+        att_train = torch.stack([semantic_distribution.sample(num_samples=1, n_points=1, context=l[0]).reshape(1, -1) 
+                                 for l in label['train_idx'] - 1]).squeeze()
+        semantic_dic = {'features': context_encoder.attributes,
+                        'text_config': text_config,
+                        'att_train': np.array(att_train)}
+    else:
+        semantic_dic = {'features': context_encoder.attributes,
+                        'text_config': text_config}
     savemat(text_mat_path, semantic_dic)
 
+
 data = loadmat("data/data/CUB/data.mat")
-data_dic = {'att_train': 0,
+data_dic = {'att_train': 0,  # np.array(semantic_dic['att_train']),
             'attribute': semantic_dic['features'],
             'seen_pro': np.squeeze(semantic_dic['features'][image_dic['seen_id'] - 1]),
             'unseen_pro': np.squeeze(semantic_dic['features'][image_dic['unseen_id'] - 1]),
@@ -69,4 +80,4 @@ data_dic = {'att_train': 0,
 with open(f"{data_dic_path[:-3]}yaml", "w") as f:
     yaml.dump(config, f)
 print(f'\n{IDENTITY} .mat file saved to:  {data_dic_path}')
-# savemat(data_dic_path, data_dic)
+savemat(data_dic_path, data_dic)

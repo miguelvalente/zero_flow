@@ -30,7 +30,7 @@ mdd_loss:
   value: 0.1
 prototype:
   desc: weight of the prototype loss
-  value: 0
+  value: 1
 dataroot:
   desc: path to dataset
   value: 'data/data'
@@ -93,7 +93,11 @@ relative_positioning:
   value: True
 data_dir:
   desc: data directory
-  value: 'data/CUB_200_2011/mat/resnet50d_proposed_split.txt_sentence_clean_whole.mat'
+  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_cleanedup_False.mat
+  value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_porter755_False.mat
+  # 'data/CUB_200_2011/mat/resnet50d_proposed_split.txt_sentence_clean_whole.mat'
+  # value: 'data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_cleaner_whole_True.mat'
+  # '
   # data/CUB_200_2011/mat/resnet50d_proposed_split.txt_sentence_len_clean.mat'
   # 'data/CUB_200_2011/mat/resnet50d_hard_split.txt_sentence_len.mat' #'data/CUB_200_2011/hard_split.txt'
   # value: 'data/CUB_200_2011/mat/resnet50d_albert.mat'
