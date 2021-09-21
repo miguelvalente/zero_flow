@@ -49,11 +49,12 @@ class DATA_LOADER(object):
         test_seen_feature = min_max_scaler .transform(test_seen_fea)
         test_unseen_feature = min_max_scaler .transform(test_unseen_fea)
 
-        # Semantic Features Normalization
-        # min_max_scaler = preprocessing.MinMaxScaler().fit(self.train_att)
-        # # std_scaler = preprocessing.StandardScaler().fit(self.train_att)
-        # self.train_att = min_max_scaler .transform(self.train_att)
-        # self.test_att = min_max_scaler.transform(self.test_att)
+        if opt.normalize_semantics:
+            # Semantic Features Normalization
+            min_max_scaler = preprocessing.MinMaxScaler().fit(self.train_att)
+            # std_scaler = preprocessing.StandardScaler().fit(self.train_att)
+            self.train_att = min_max_scaler .transform(self.train_att)
+            self.test_att = min_max_scaler.transform(self.test_att)
 
         # scaler = preprocessing.MinMaxScaler()
         # _train_feature = scaler.fit_transform(train_fea)
@@ -89,53 +90,6 @@ class DATA_LOADER(object):
         self.test_unseen_label = map_label(self.test_unseen_label, self.unseenclasses)
         self.test_seen_label = map_label(self.test_seen_label, self.seenclasses)
 
-    def read_matdataset(self, opt):
-        matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/" + opt.image_embedding + ".mat")
-        feature = matcontent['features'].T
-        label = matcontent['labels'].astype(int).squeeze() - 1
-        matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/" + opt.class_embedding + "_splits.mat")
-        trainval_loc = matcontent['trainval_loc'].squeeze() - 1
-        train_loc = matcontent['train_loc'].squeeze() - 1
-        val_unseen_loc = matcontent['val_loc'].squeeze() - 1
-        test_seen_loc = matcontent['test_seen_loc'].squeeze() - 1
-        test_unseen_loc = matcontent['test_unseen_loc'].squeeze() - 1
-        self.attribute = torch.from_numpy(matcontent['att'].T).float()
-        if not opt.validation:
-            scaler = preprocessing.MinMaxScaler()
-            _train_feature = scaler.fit_transform(feature[trainval_loc])
-            _test_seen_feature = scaler.transform(feature[test_seen_loc])
-            _test_unseen_feature = scaler.transform(feature[test_unseen_loc])
-            self.train_feature = torch.from_numpy(_train_feature).float()
-            mx = self.train_feature.max()
-            self.train_feature.mul_(1 / mx)
-            self.train_label = torch.from_numpy(label[trainval_loc]).long()
-            self.test_unseen_feature = torch.from_numpy(_test_unseen_feature).float()
-            self.test_unseen_feature.mul_(1 / mx)
-            self.test_unseen_label = torch.from_numpy(label[test_unseen_loc]).long()
-            self.test_seen_feature = torch.from_numpy(_test_seen_feature).float()
-            self.test_seen_feature.mul_(1 / mx)
-            self.test_seen_label = torch.from_numpy(label[test_seen_loc]).long()
-        else:
-            self.train_feature = torch.from_numpy(feature[train_loc]).float()
-            self.train_label = torch.from_numpy(label[train_loc]).long()
-            self.test_unseen_feature = torch.from_numpy(feature[val_unseen_loc]).float()
-            self.test_unseen_label = torch.from_numpy(label[val_unseen_loc]).long()
-
-        self.seenclasses = torch.from_numpy(np.unique(self.train_label.numpy()))
-        self.unseenclasses = torch.from_numpy(np.unique(self.test_unseen_label.numpy()))
-        self.ntrain = self.train_feature.size()[0]
-        self.ntrain_class = self.seenclasses.size(0)
-        self.ntest_class = self.unseenclasses.size(0)
-        self.train_class = self.seenclasses.clone()
-        self.allclasses = torch.arange(0, self.ntrain_class + self.ntest_class).long()
-
-        self.train_label = map_label(self.train_label, self.seenclasses)
-        self.test_unseen_label = map_label(self.test_unseen_label, self.unseenclasses)
-        self.test_seen_label = map_label(self.test_seen_label, self.seenclasses)
-
-        self.train_att = self.attribute[self.seenclasses].numpy()
-        self.test_att = self.attribute[self.unseenclasses].numpy()
-        self.attribute = np.concatenate((self.train_att, self.test_att))
 
 class FeatDataLayer(object):
     def __init__(self, label, feat_data, opt):

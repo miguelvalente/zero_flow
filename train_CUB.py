@@ -101,7 +101,7 @@ def train():
 
     permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
     non_linearity = nn.PReLU(init=0.01)
-    hidden_dims = [input_dim // 2] * 2
+    hidden_dims = [input_dim] * 2 
 
     transform = []
     for index in range(5):
@@ -243,7 +243,7 @@ def train():
             else:
                 train_X = gen_feat
                 train_Y = gen_label
-                cls = classifier.CLASSIFIER(config, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
+                cls = classifier.CLASSIFIER(run, config, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
                                             dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, config.gzsl)
 
                 result.update(it, cls.acc)

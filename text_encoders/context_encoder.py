@@ -13,7 +13,8 @@ from tqdm import tqdm
 
 from text_encoders.text_encoder import (AlbertEncoder, BartEncoder,
                                         BertEncoder, BigBirdEncoder,
-                                        ProphetNet, SentencePiece)
+                                        ProphetNet, SentencePiece,
+                                        TFIDF)
 from text_encoders.word_embeddings import WordEmbeddings
 import nltk
 from nltk.corpus import stopwords
@@ -29,7 +30,12 @@ class ContextEncoder():
         self.config = config
         self.device = device
 
-        if self.config['text_encoder'] == 'prophet_net':
+        if self.config['weigthed_encoding']:
+            self.tfidf = TFIDF(self.config, device=self.device)
+
+        if 'tfidf' in self.config['text_encoder']:
+            self.text_encoder = TFIDF(self.config, device=self.device)
+        elif 'prophet' in self.config['text_encoder']:
             self.text_encoder = ProphetNet(self.config, device=self.device)
         elif self.config['text_encoder'] == 'albert':
             self.text_encoder = AlbertEncoder(self.config, device=self.device)
@@ -48,9 +54,9 @@ class ContextEncoder():
             raise Exception
 
         if self.config['dataset'] == 'imagenet':
-            self._encode_contexts_imagenet()
+            self._encode_contexts_imagenet(weigthed_encoding=self.config['text_encoder'])
         elif self.config['dataset'] == 'cub2011':
-            self._encode_contexts_cub2011()
+            self._encode_contexts_cub2011(weigthed_encoding=self.config['text_encoder'])
         else:
             print(f"{IDENTITY} Dataset not found")
             raise Exception
@@ -59,17 +65,15 @@ class ContextEncoder():
         articles = [re.sub(r'\d+', '', art.lower()).translate(str.maketrans('', '', string.punctuation))
                     for art in _articles]
 
-        # clean_articles = []
-        # for art in articles:
-        #     clean_articles.append(" ".join([word for word in art.split() if word not in stop_words]))
-
-        # clean_art = []
-        # for art in articles:
-        #     clean_art.append([sentence for sentence in art.split('\n') if sentence if len(sentence) >= 9])
+        if self.config['stop_word']:
+            clean_articles = []
+            for art in articles:
+                clean_articles.append(" ".join([word for word in art.split() if word not in stopwords.words('english')]))
+            articles = clean_articles
 
         return articles
 
-    def _encode_contexts_cub2011(self):
+    def _encode_contexts_cub2011(self, weigthed_encoding=False):
         wiki_dir = 'data/CUBird_WikiArticles'
 
         file_list = next(os.walk(wiki_dir), (None, None, []))[2]
@@ -80,11 +84,22 @@ class ContextEncoder():
         if self.config['preprocess_text']:
             articles = self._pre_process_articles(articles)
 
-        semantic = tqdm(articles, desc=f'{IDENTITY} Encoding All Semantic Descriptions CUB2011')
-        with torch.no_grad():
-            contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
-
-        self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
+        if weigthed_encoding:
+            _, term_value = self.tfidf(articles)
+            self.attributes = np.stack([(self.text_encoder(terms)).mean(axis=0)
+                                      for terms, values in term_value]).astype(np.float32)
+            print()
+                # 2 options:
+                # - encode all as one
+                # - encode each word separatly and weigth it
+        else:
+            if 'tfidf' in self.config['text_encoder']:
+                self.attributes, _ = self.text_encoder(articles)
+            else:
+                semantic = tqdm(articles, desc=f'{IDENTITY} Encoding All Semantic Descriptions CUB2011')
+                with torch.no_grad():
+                    contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
+                self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
 
     def _encode_contexts_imagenet(self):
         class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"

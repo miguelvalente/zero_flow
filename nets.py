@@ -23,11 +23,11 @@ class MLP(nn.Module):
         for index, layer in enumerate(self.layers):
             if ((index % 2) == 0):
                 residual = x
-                x = self.out_layer(self.nonlin(layer(x)))
+                x = self.nonlin(layer(x))
             else:
-                x = self.out_layer(self.nonlin(residual + layer(x)))
+                x = self.nonlin(residual + layer(x))
 
-        return x
+        return self.out_layer(x)
 
 class Classifier(nn.Module):
     def __init__(self, input_dim, nclass):
