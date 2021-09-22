@@ -48,7 +48,7 @@ weight_decay:
   value: 1e-5
 classifier_lr:
   desc: learning rate to train softmax classifier'
-  value: 0.01
+  value: 0.005
 number_sample:
   desc: number features to generate per class
   value: 600
@@ -66,16 +66,17 @@ manualSeed:
   value: 6400
 semantic_vector_dim:
   desc: Dimension of semantic vectors
-  value: 1024
+  value: 1792
+  # value: 1024
 pi:
   desc: degree of the perturbation
-  value: 0.05
+  value: 0
 dropout:
   desc: probaility of droping dimension in he perturbation noise
   value: 0.0
 gzsl:
   desc: The paradigm of zero-shot learning
-  value: True
+  value: False
 clusters:
   desc:
   value: 3
@@ -96,11 +97,12 @@ normalize_semantics:
   value: False
 data_dir:
   desc: data directory
-  value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_weigthed_False.mat
+  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_tf_idf_mean_False.mat
+  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_weigthed_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_full_stop_bigram_7000_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_full_stop_bigram_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_5000_False.mat
-  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_7000_False.mat
+  value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_7000_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_unfiltered_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_cleanedup_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_porter755_False.mat

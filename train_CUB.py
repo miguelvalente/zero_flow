@@ -38,7 +38,8 @@ with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
     temp = yaml.safe_load(y)
     wandb.config['image_encoder'] = temp['image_encoder']
     wandb.config['text_encoder'] = temp['text_encoder']
-    wandb.config['split'] = temp['split']
+    # wandb.config['split'] = temp['split']
+    wandb.config['split'] = 'easy'
     wandb.config['dataset'] = temp['dataset']
     del temp
 
@@ -88,7 +89,7 @@ def train():
     medi = dataset.train_att[int(medi_idx)]
     vertices = torch.from_numpy(np.stack((min, max, medi))).float().cuda()
 
-    input_dim = 2048
+    input_dim = dataset.train_feature.shape[1]
     if config.relative_positioning:
         context_dim = dataset.train_att.shape[1] if config.semantic_vector_dim == 0 else config.semantic_vector_dim
     else:
@@ -101,7 +102,7 @@ def train():
 
     permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
     non_linearity = nn.PReLU(init=0.01)
-    hidden_dims = [input_dim] * 2 
+    hidden_dims = [input_dim] * 2
 
     transform = []
     for index in range(5):
@@ -159,8 +160,8 @@ def train():
             sr = sm(C)
         else:
             sr = labels
-        z = config.pi * torch.randn(config.batchsize, 2048).cuda()
-        mask = torch.cuda.FloatTensor(2048).uniform_() > config.dropout
+        z = config.pi * torch.randn(config.batchsize, input_dim).cuda()
+        mask = torch.cuda.FloatTensor(input_dim).uniform_() > config.dropout
         z = mask * z
         X = X + z
 

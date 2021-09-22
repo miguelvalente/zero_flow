@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 import scipy.io as sio
 from sklearn import preprocessing
 import torch
@@ -13,7 +14,10 @@ def map_label(label, classes):
 class DATA_LOADER(object):
     def __init__(self, opt):
         if opt.dataset in ['FLO', 'cub2011']:
-            self.read(opt)
+            if 'easy' in opt.split:
+                self.read_easy(opt)
+            else:
+                self.read(opt)
         else:
             self.read_matdataset(opt)
         self.index_in_epoch = 0
@@ -22,8 +26,98 @@ class DATA_LOADER(object):
         self.att_dim = self.attribute.shape[1]
         self.text_dim = self.att_dim
         self.tr_cls_centroid = np.zeros([self.seenclasses.shape[0], self.feature_dim], np.float32)
-        for i in range(self.seenclasses.shape[0]):
-            self.tr_cls_centroid[i] = np.mean(self.train_feature[self.train_label == i].numpy(), axis=0)
+        # for i in range(self.seenclasses.shape[0]):
+        #     self.tr_cls_centroid[i] = np.mean(self.train_feature[self.train_label == i].numpy(), axis=0)
+
+    def read_easy(self, opt): 
+        txt_feat_path = 'data/CIZSL/CUB2011/CUB_Porter_7551D_TFIDF_new.mat'
+        # matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/data.mat")
+        is_val = False
+        if 'easy' in opt.split:
+            train_test_split_dir = 'data/CIZSL/CUB2011/train_test_split_easy.mat'
+            pfc_label_path_train = 'data/CIZSL/CUB2011/labels_train.pkl'
+            pfc_label_path_test = 'data/CIZSL/CUB2011/labels_test.pkl'
+            pfc_feat_path_train = 'data/CIZSL/CUB2011/pfc_feat_train.mat'  # pfc_feat (8855, 3584)
+            pfc_feat_path_test = 'data/CIZSL/CUB2011/pfc_feat_test.mat'  # pfc_feat (2933, 3584)
+
+            if is_val:
+                train_cls_num = 120
+                test_cls_num = 30
+            else:
+                train_cls_num = 150
+                test_cls_num = 50
+        elif 'hard' in opt.split:
+            train_test_split_dir = 'data/CIZSL/CUB2011/train_test_split_hard.mat'
+            pfc_label_path_train = 'data/CIZSL/CUB2011/labels_train_hard.pkl'
+            pfc_label_path_test = 'data/CIZSL/CUB2011/labels_test_hard.pkl'
+            pfc_feat_path_train = 'data/CIZSL/CUB2011/pfc_feat_train_hard.mat'  # pfc_feat (9410, 3584)
+            pfc_feat_path_test = 'data/CIZSL/CUB2011/pfc_feat_test_hard.mat'  # pfc_feat (2378, 3584)
+
+            if is_val:
+                train_cls_num = 130
+                test_cls_num = 30
+            else:
+                train_cls_num = 160
+                test_cls_num = 40
+
+        if is_val:
+            # load .mat as numpy by scipy.io as sio, easy (8855, 3584) e.g.
+            data_features = sio.loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
+            # load .pkl label file
+            with open(pfc_label_path_train) as fout:
+                data_labels = pickle.load(fout, encoding="latin1")
+                # print('=============', data_labels.shape)
+            # assert 0
+
+            # why we use data_labels < train_cls_num
+            self.pfc_feat_data_train = data_features[data_labels < train_cls_num]
+            self.pfc_feat_data_test = data_features[data_labels >= train_cls_num]
+            self.labels_train = data_labels[data_labels < train_cls_num]
+            self.labels_test = data_labels[data_labels >= train_cls_num] - train_cls_num
+
+            text_features, _ = get_text_feature(txt_feat_path, train_test_split_dir)  # Z_tr, Z_te
+            self.train_text_feature, self.test_text_feature = text_features[:train_cls_num], text_features[train_cls_num:]
+            self.att_dim = self.train_text_feature.shape[1]
+        else:
+            self.pfc_feat_data_train = sio.loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
+            self.pfc_feat_data_test = sio.loadmat(pfc_feat_path_test)['pfc_feat'].astype(np.float32)
+            # calculate the corresponding centroid.
+            with open(pfc_label_path_train, 'rb') as fout1, open(pfc_label_path_test, 'rb') as fout2:
+                self.labels_train = pickle.load(fout1, encoding="latin1")
+                self.labels_test = pickle.load(fout2, encoding="latin1")
+
+        self.train_cls_num = train_cls_num  # Y_train
+        self.test_cls_num = test_cls_num  # Y_test
+        self.feature_dim = self.pfc_feat_data_train.shape[1]
+
+        # Normalize feat_data to zero-centered
+        mean = self.pfc_feat_data_train.mean()
+        var = self.pfc_feat_data_train.var()
+        self.pfc_feat_data_train = (self.pfc_feat_data_train - mean) / var  # X_tr
+        self.pfc_feat_data_test = (self.pfc_feat_data_test - mean) / var  # X_te
+
+        self.tr_cls_centroid = np.zeros([self.train_cls_num, self.pfc_feat_data_train.shape[1]]).astype(np.float32)
+        # print(self.tr_cls_centroid.shape) # e.g. (160, 3584)
+
+        # calculate the feature mean of each class
+        for i in range(self.train_cls_num):
+            self.tr_cls_centroid[i] = np.mean(self.pfc_feat_data_train[self.labels_train == i], axis=0)
+
+        if not is_val:
+            self.train_text_feature, self.test_text_feature = get_text_feature(txt_feat_path,
+                                                                               train_test_split_dir)  # Z_tr, Z_te
+            self.att_dim = self.train_text_feature.shape[1]
+
+        self.ntrain_class = self.train_cls_num
+        self.train_feature = torch.tensor(self.pfc_feat_data_train)
+        self.test_feature = self.pfc_feat_data_test
+        self.train_label = torch.tensor(self.labels_train)
+        self.test_label = self.labels_test
+        self.train_att = self.train_text_feature
+        self.ntrain = self.train_feature.shape[0]
+        self.attribute = np.vstack((self.train_text_feature, self.test_text_feature))
+        self.seenclasses = np.unique(self.train_label)
+        self.test_seen_label = torch.tensor(self.train_label.clone().detach())
 
     def read(self, opt):
         # matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/data.mat")
@@ -135,3 +229,17 @@ class FeatDataLayer(object):
     def get_whole_data(self):
         blobs = {'data': self._feat_data, 'labels': self._label}
         return blobs
+
+def get_text_feature(dir, train_test_split_dir):
+    train_test_split = sio.loadmat(train_test_split_dir)
+    # get training text feature
+    train_cid = train_test_split['train_cid'].squeeze()
+    text_feature = sio.loadmat(dir)['PredicateMatrix']
+    train_text_feature = text_feature[train_cid - 1]  # 0-based index
+
+    # get testing text feature
+    test_cid = train_test_split['test_cid'].squeeze()
+    text_feature = sio.loadmat(dir)['PredicateMatrix']
+    test_text_feature = text_feature[test_cid - 1]  # 0-based index
+    return train_text_feature.astype(np.float32), test_text_feature.astype(np.float32)
+
