@@ -5,7 +5,7 @@ save_text_features: 'data/CUB_200_2011/mat/text/'
 # mat_file_text: 'data/CUB_200_2011/mat/text/att_splits_ordered.mat'
 # mat_file_text: 'data/CUB_200_2011/mat/text/glove.840B.300d.mat'
 glove_dir: /project/data/glove.840B.300d.txt # /project/data/image_net/train
-text_encoder: sentence_tf_idf_mean #bert # glove #albert-base-v2 # manual #glove #albert #bart #albert  # prophet_net
+text_encoder: albertxx #sentence_tf_idf_mean #bert # glove #albert-base-v2 # manual #glove #albert #bart #albert  # prophet_net
 weigthed_encoding: True
 preprocess_text: True
 semantic_sampling: False

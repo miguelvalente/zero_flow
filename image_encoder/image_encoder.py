@@ -78,10 +78,18 @@ class ImageEncoder():
 
         features_train = []
         features_val = []
+        features = []
+        features_wnid = []
         for img_path in tqdm(imagenet.img_paths, desc=f"({self.config['split']}): Extracting Visual Features"):
             img = self.loader(img_path)
             img = self._encode(img)
-            # img_id = imagenet.wnid_to_id[imagenet.wnid_to_id["wnid"] == img_path.split('/')[3]].id.values[0]
+            features_wnid.append(imagenet.wnid_to_id[imagenet.wnid_to_id["wnid"] == img_path.split('/')[3]].wnid.values[0])
             # features_train.append(img) if img_id in imagenet.seen_id else features_val.append(img)
-            features_train.append(img) if 'train' in img_path else features_val.append(img)
+            # features_train.append(img) if 'train' in img_path else features_val.append(img)
+            features.append(img)
 
+        self.features = np.stack(features)
+        self.features_wnid = np.stack(features_wnid)
+
+        # self.features_train = np.stack(features_train)
+        # self.features_val = np.stack(features_val)

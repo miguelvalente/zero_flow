@@ -1,23 +1,58 @@
 import os
+import pickle
 import sys
 
-import timm
 import numpy as np
 import torch
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
 import tqdm
 import yaml
-from PIL import Image
 from scipy.io import loadmat, savemat
-from timm.data import resolve_data_config
-from timm.data.transforms_factory import create_transform
 
-from distributions import DoubleDistribution, SemanticDistribution
+from distributions import SemanticDistribution
 from image_encoder.image_encoder import ImageEncoder
 from text_encoders.context_encoder import ContextEncoder
+import pandas as pd
 
 IDENTITY = '  Data Preprocess ~| '
+
+def pickle_to_mat(path, config):
+    if config['dataset'] == 'cub2011':
+        dir_data = 'CUB_200_2011'
+    else:
+        dir_data = 'image_net'
+
+    path = 'data/image_net/mat/text/ALBERT_ImageNet_trainval_classes_classes.pkl'
+    corre = pd.read_csv('data/image_net/wnid_correspondance.csv', sep=' ', names=['id', 'wnid'])
+    splits = loadmat('data/xlsa17/data/ImageNet/ImageNet_splits.mat')
+
+    seen = np.sort(splits['train_classes'].squeeze())
+    unseen = np.sort(splits['val_classes'].squeeze())
+    with open(path, 'rb') as f:
+        data = pickle.load(f)
+
+    train_att = []
+    val_att = []
+    att = []
+    wnid_att = []
+    for k, v in data.items():
+        att.append(v['feats'])
+        wnid_att.append(v['wnid'])
+        img_id = corre[corre["wnid"] == v['wnid']].id.values[0]
+        train_att.append(v['feats']) if img_id in seen else val_att.append(v['feats'])
+
+    train_att = np.stack(train_att)
+    val_att = np.stack(val_att)
+    att = np.stack(att)
+    wnid_att = np.stack(wnid_att)
+
+    semantic_dic = {'att': att,
+                    'wnid': wnid_att}
+
+    text_mat_path = f"data/{dir_data}/mat/text/{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
+
+    savemat(text_mat_path, semantic_dic)
+    sys.exit()
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
@@ -31,9 +66,11 @@ if config['dataset'] == 'cub2011':
 else:
     dir_data = 'image_net'
 
-image_mat_path = f"data/dir_data/mat/visual/{config['image_encoder']}.mat"
-text_mat_path = f"data/dir_data/mat/text/{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
-data_dic_path = f"data/dir_data/mat/{config['image_encoder']}_{config['split'][:-4]}_{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
+image_mat_path = f"data/{dir_data}/mat/visual/{config['image_encoder']}.mat"
+text_mat_path = f"data/{dir_data}/mat/text/{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
+data_dic_path = f"data/{dir_data}/mat/{config['image_encoder']}_{config['split'][:-4]}_{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
+
+# pickle_to_mat('asd', config)
 
 if os.path.exists(data_dic_path):
     print(f'\n{IDENTITY} {data_dic_path} already exists.')
@@ -53,7 +90,8 @@ else:
                      'test_unseen_loc': image_encoder.test_unseen_loc,
                      'image_config': image_config}
     else:
-        pass
+        image_dic = {'features': image_encoder.features,
+                     'features_wnid': image_encoder.features_wnid}
     savemat(image_mat_path, image_dic)
 
 if os.path.exists(text_mat_path):
@@ -75,7 +113,7 @@ else:
                             'text_config': text_config}
     else:
         pass
-    savemat(text_mat_path, semantic_dic)
+    # savemat(text_mat_path, semantic_dic)
 
 if config['dataset'] == "cub2011":
     data = loadmat("data/data/CUB/data.mat")
@@ -92,4 +130,4 @@ else:
 with open(f"{data_dic_path[:-3]}yaml", "w") as f:
     yaml.dump(config, f)
 print(f'\n{IDENTITY} .mat file saved to:  {data_dic_path}')
-savemat(data_dic_path, data_dic)
+# savemat(data_dic_path, data_dic)
