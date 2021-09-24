@@ -14,7 +14,7 @@ def map_label(label, classes):
 class DATA_LOADER(object):
     def __init__(self, opt):
         if opt.dataset in ['FLO', 'cub2011']:
-            if 'easy' in opt.split:
+            if 'easy' or 'hard' in opt.split:
                 self.read_easy(opt)
             else:
                 self.read(opt)
@@ -29,7 +29,7 @@ class DATA_LOADER(object):
         # for i in range(self.seenclasses.shape[0]):
         #     self.tr_cls_centroid[i] = np.mean(self.train_feature[self.train_label == i].numpy(), axis=0)
 
-    def read_easy(self, opt): 
+    def read_easy(self, opt):
         txt_feat_path = 'data/CIZSL/CUB2011/CUB_Porter_7551D_TFIDF_new.mat'
         # matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/data.mat")
         is_val = False
@@ -109,15 +109,23 @@ class DATA_LOADER(object):
             self.att_dim = self.train_text_feature.shape[1]
 
         self.ntrain_class = self.train_cls_num
+        self.ntest_class = self.test_cls_num
         self.train_feature = torch.tensor(self.pfc_feat_data_train)
         self.test_feature = self.pfc_feat_data_test
         self.train_label = torch.tensor(self.labels_train)
         self.test_label = self.labels_test
         self.train_att = self.train_text_feature
+        self.test_att = self.test_text_feature
         self.ntrain = self.train_feature.shape[0]
         self.attribute = np.vstack((self.train_text_feature, self.test_text_feature))
+
         self.seenclasses = np.unique(self.train_label)
+        self.unseenclasses = np.unique(self.test_label)
+
         self.test_seen_label = torch.tensor(self.train_label.clone().detach())
+        self.test_unseen_label = torch.tensor(self.labels_test)
+
+        self.test_unseen_feature = torch.tensor(self.pfc_feat_data_test)
 
     def read(self, opt):
         # matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/data.mat")

@@ -10,5 +10,5 @@ weigthed_encoding: True
 preprocess_text: True
 semantic_sampling: False
 stop_word: True
-dataset: cub2011 #manual_cub2011 #imagenet
+dataset: imagenet # cub2011 #manual_cub2011 #imagenet
 # glove_dir: 

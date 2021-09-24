@@ -91,7 +91,7 @@ def synthesize_feature(flow, dataset, opt, sm=None):
                 sr = sm(text_feat)
             else:
                 sr = text_feat
-            z = torch.randn(opt.number_sample, 2048 - sr.shape[1]).cuda()
+            z = torch.randn(opt.number_sample, dataset.train_feature.shape[1] - sr.shape[1]).cuda()
             # z = z*z.norm(dim=-1, keepdim=True)
             G_sample = flow.generation(torch.cat((sr, z), dim=1))
             # G_sample = flow.reverse_sample(z, sr)

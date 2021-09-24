@@ -11,7 +11,7 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 import numpy as np
 
-IDENTITY = 'Visual Encoder| '
+IDENTITY = 'CUB Encoder| '
 
 class Cub2011(Dataset):
     '''

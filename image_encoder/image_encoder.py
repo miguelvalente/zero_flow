@@ -15,6 +15,7 @@ from torchvision.datasets.utils import download_url
 from tqdm import tqdm
 
 from image_encoder.cub2011 import Cub2011
+from image_encoder.imagenet import ImageNet
 
 IDENTITY = 'Image Encoder| '
 
@@ -71,3 +72,16 @@ class ImageEncoder():
             visual_features.append(img)
 
         self.features = [feature.numpy() for feature in visual_features]
+
+    def _encode_imagenet(self):
+        imagenet = ImageNet(config=self.config, root='/project/data/')
+
+        features_train = []
+        features_val = []
+        for img_path in tqdm(imagenet.img_paths, desc=f"({self.config['split']}): Extracting Visual Features"):
+            img = self.loader(img_path)
+            img = self._encode(img)
+            # img_id = imagenet.wnid_to_id[imagenet.wnid_to_id["wnid"] == img_path.split('/')[3]].id.values[0]
+            # features_train.append(img) if img_id in imagenet.seen_id else features_val.append(img)
+            features_train.append(img) if 'train' in img_path else features_val.append(img)
+

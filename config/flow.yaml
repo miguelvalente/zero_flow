@@ -54,13 +54,13 @@ number_sample:
   value: 600
 disp_interval:
   desc: interval
-  value: 200
+  value: 100
 save_interval:
   desc: save inetrvak of checkpoint
   value: 10000
 evl_interval:
   desc: eval interval
-  value: 500
+  value: 100
 manualSeed:
   desc: manual seed
   value: 6400

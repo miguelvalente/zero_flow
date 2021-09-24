@@ -36,8 +36,10 @@ run = wandb.init(project='zero_flow_CUB', entity='mvalente',
 config = wandb.config
 with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
     temp = yaml.safe_load(y)
-    wandb.config['image_encoder'] = temp['image_encoder']
-    wandb.config['text_encoder'] = temp['text_encoder']
+    wandb.config['image_encoder'] = 'cizsl'
+    wandb.config['text_encoder'] = 'cizsl'
+    # wandb.config['image_encoder'] = 'cizsl' temp['image_encoder']
+    # wandb.config['text_encoder'] = 'cizsl'temp['text_encoder']
     # wandb.config['split'] = temp['split']
     wandb.config['split'] = 'easy'
     wandb.config['dataset'] = temp['dataset']
@@ -102,7 +104,7 @@ def train():
 
     permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
     non_linearity = nn.PReLU(init=0.01)
-    hidden_dims = [input_dim] * 2
+    hidden_dims = [input_dim] * 3
 
     transform = []
     for index in range(5):
@@ -211,7 +213,7 @@ def train():
             log_text = f'Iter-[{it}/{config.niter}]; loss: {loss.item():.3f}'
             log_print(log_text, log_dir)
 
-        if it % config.evl_interval == 0 and it >= 500:
+        if it % config.evl_interval == 0 and it >= 100:
             flow.eval()
             if config.relative_positioning:
                 sm.eval()
@@ -244,7 +246,7 @@ def train():
             else:
                 train_X = gen_feat
                 train_Y = gen_label
-                cls = classifier.CLASSIFIER(run, config, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
+                cls = classifier.CLASSIFIER(run, config, train_X, train_Y, dataset, dataset.test_unseen_feature, dataset.test_unseen_feature,
                                             dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, config.gzsl)
 
                 result.update(it, cls.acc)
