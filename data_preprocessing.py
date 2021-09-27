@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import tqdm
 import yaml
+import h5py 
 from scipy.io import loadmat, savemat
 
 from distributions import SemanticDistribution
@@ -33,20 +34,25 @@ def pickle_to_mat(path, config):
     train_att = []
     val_att = []
     att = []
-    wnid_att = []
+    wnid_att_train = []
+    wnid_att_test = []
     for k, v in data.items():
         att.append(v['feats'])
-        wnid_att.append(v['wnid'])
         img_id = corre[corre["wnid"] == v['wnid']].id.values[0]
         train_att.append(v['feats']) if img_id in seen else val_att.append(v['feats'])
+        wnid_att_train.append(v['wnid']) if img_id in seen else wnid_att_test.append(v['wnid'])
 
     train_att = np.stack(train_att)
     val_att = np.stack(val_att)
     att = np.stack(att)
-    wnid_att = np.stack(wnid_att)
+    wnid_att_train = np.stack(wnid_att_train)
+    wnid_att_test = np.stack(wnid_att_test)
 
-    semantic_dic = {'att': att,
-                    'wnid': wnid_att}
+    semantic_dic = {'features': att,
+                    'train_att': train_att,
+                    'val_att': val_att,
+                    'wnid_train': wnid_att_train,
+                    'wnid_test': wnid_att_test}
 
     text_mat_path = f"data/{dir_data}/mat/text/{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
 
@@ -70,7 +76,7 @@ image_mat_path = f"data/{dir_data}/mat/visual/{config['image_encoder']}.mat"
 text_mat_path = f"data/{dir_data}/mat/text/{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
 data_dic_path = f"data/{dir_data}/mat/{config['image_encoder']}_{config['split'][:-4]}_{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
 
-# pickle_to_mat('asd', config)
+pickle_to_mat('asd', config)
 
 if os.path.exists(data_dic_path):
     print(f'\n{IDENTITY} {data_dic_path} already exists.')
@@ -80,7 +86,7 @@ if os.path.exists(image_mat_path):
     print(f'\n{IDENTITY} .mat exists. Loading {image_mat_path} instead of encoding images.')
     image_dic = loadmat(image_mat_path)
 else:
-    image_encoder = ImageEncoder(config)
+    # image_encoder = ImageEncoder(config)
     if config['dataset'] == 'cub2011':
         image_dic = {'features': np.stack(image_encoder.features),
                      'seen_id': image_encoder.seen_id,
@@ -90,9 +96,17 @@ else:
                      'test_unseen_loc': image_encoder.test_unseen_loc,
                      'image_config': image_config}
     else:
-        image_dic = {'features': image_encoder.features,
-                     'features_wnid': image_encoder.features_wnid}
-    savemat(image_mat_path, image_dic)
+        with h5py.File('/project/data/image_net/ILSVRC2012_res101_feature.mat', 'r') as f:
+            labels = np.array(f['labels'], dtype=np.int64).flatten()
+            labels_val = np.array(f['labels_val'], dtype=np.int64).flatten()
+
+            features = np.array(f['features'])
+            features_val = np.array(f['features_val'])
+        image_dic = {'features': features,
+                     'features_val': features_val,
+                     'labels': labels,
+                     'labels_val': labels_val}
+    savemat(image_mat_path, image_dic, format='4')
 
 if os.path.exists(text_mat_path):
     print(f'\n{IDENTITY} .mat exists. Loading {text_mat_path} instead of encoding text.')
@@ -125,7 +139,13 @@ if config['dataset'] == "cub2011":
                 'test_seen_fea': np.squeeze(image_dic['features'][image_dic['test_seen_loc'] - 1]),
                 'test_unseen_fea': np.squeeze(image_dic['features'][image_dic['test_unseen_loc'] - 1])}
 else:
-    pass
+    data_dic = {'att_train': 0,  # np.array(semantic_dic['att_train']),
+                'attribute': semantic_dic['features'],
+                'seen_pro': np.squeeze(semantic_dic['features'][image_dic['seen_id'] - 1]),
+                'unseen_pro': np.squeeze(semantic_dic['features'][image_dic['unseen_id'] - 1]),
+                'train_fea': np.squeeze(image_dic['features'][image_dic['train_loc'] - 1]),
+                'test_seen_fea': np.squeeze(image_dic['features'][image_dic['test_seen_loc'] - 1]),
+                'test_unseen_fea': np.squeeze(image_dic['features'][image_dic['test_unseen_loc'] - 1])}
 
 with open(f"{data_dic_path[:-3]}yaml", "w") as f:
     yaml.dump(config, f)

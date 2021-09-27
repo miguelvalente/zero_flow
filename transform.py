@@ -83,14 +83,21 @@ class Flow(Transform):
             z = transform.inverse(z, context=context)
         return z
 
-    def centralizing_loss(self, data, targets, cs, seen_id):
+    def centralizing_loss(self, data, targets, cs, seen_id, attribute_to_idx=None):
         """
         Centralizing loss
         """
         padding = data.shape[1] - cs.shape[1]
         means = torch.stack([data[targets == t].mean(axis=0) for t in targets.unique()])
 
-        idxs = [np.where(seen_id == target)[0][0] for target in np.asarray(targets.unique().to("cpu").detach())]
+        if attribute_to_idx is not None:
+            idxs = []
+            for target in np.asarray(targets.unique().to("cpu").detach()):
+                new_target = np.argwhere(attribute_to_idx == target)[0][0]
+                idxs.append(np.where(seen_id == new_target)[0][0])
+            idxs = np.stack(idxs)
+        else:
+            idxs = [np.where(seen_id == target)[0][0] for target in np.asarray(targets.unique().to("cpu").detach())]
 
         gens = self.generation(F.pad(cs[idxs], (0, padding)))
 

@@ -30,20 +30,24 @@ from utils import Result, log_print, save_model, synthesize_feature
 
 CUDA_LAUNCH_BLOCKING = 1
 os.environ['WANDB_MODE'] = 'online'
-run = wandb.init(project='zero_flow_CUB', entity='mvalente',
+run = wandb.init(project='zero_flow_imagenet', entity='mvalente',
                  config=r'config/flow.yaml')
 
 config = wandb.config
-with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
-    temp = yaml.safe_load(y)
-    wandb.config['image_encoder'] = 'cizsl'
-    wandb.config['text_encoder'] = 'cizsl'
-    # wandb.config['image_encoder'] = 'cizsl' temp['image_encoder']
-    # wandb.config['text_encoder'] = 'cizsl'temp['text_encoder']
-    # wandb.config['split'] = temp['split']
-    wandb.config['split'] = 'easy'
-    wandb.config['dataset'] = temp['dataset']
-    del temp
+# with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
+#     temp = yaml.safe_load(y)
+#     wandb.config['image_encoder'] = 'cizsl'
+#     wandb.config['text_encoder'] = 'cizsl'
+#     # wandb.config['image_encoder'] = 'cizsl' temp['image_encoder']
+#     # wandb.config['text_encoder'] = 'cizsl'temp['text_encoder']
+#     # wandb.config['split'] = temp['split']
+#     # wandb.config['split'] = 'easy'
+#     wandb.config['dataset'] = temp['dataset']
+#     del temp
+
+wandb.config['dataset'] = 'imagenet'
+wandb.config['image_encoder'] = 'resnet101'
+wandb.config['text_encoder'] = 'albertxxl'
 
 wandb.define_metric('Harmonic Mean', summary='max')
 wandb.define_metric('Accuracy Unseen', summary='max')
@@ -148,13 +152,17 @@ def train():
         labels_numpy = blobs['labels'].astype(int)  # class labels
         labels = torch.from_numpy(labels_numpy.astype('int')).cuda()
 
-        if config.relative_positioning:
-            C = np.array([dataset.train_att[i, :] for i in labels])
-            # C = np.array([dataset.train_att_sampled[i] for i in blobs['idx']])
-            C = torch.from_numpy(C.astype('float32')).cuda()
+        if config.dataset == 'cub2011':
+            if config.relative_positioning:
+                C = np.array([dataset.train_att[i, :] for i in labels])
+                # C = np.array([dataset.train_att_sampled[i] for i in blobs['idx']])
+                C = torch.from_numpy(C.astype('float32')).cuda()
+            else:
+                C = np.array([dataset.train_att_sampled[i] for i in blobs['idx']])
+                C = torch.from_numpy(C.astype('float32')).cuda()
         else:
-            C = np.array([dataset.train_att_sampled[i] for i in blobs['idx']])
-            C = torch.from_numpy(C.astype('float32')).cuda()
+            labels_d = np.array((labels.detach().cpu()))
+            C = torch.stack([dataset.attribute[i] for i in labels_d]).cuda()
 
         X = torch.from_numpy(feat_data).cuda()
 
@@ -187,7 +195,10 @@ def train():
             sr = torch.from_numpy(dataset.train_att).cuda()
 
         if config.centralizing_loss > 0:
-            centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label))
+            if config['dataset'] == 'cub2011':
+                centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label))
+            else:
+                centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label), dataset.attribute_to_idx)
             loss += centralizing_loss
             run.log({"loss_central": centralizing_loss.item()})
 

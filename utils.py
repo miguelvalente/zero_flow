@@ -84,19 +84,37 @@ def synthesize_feature(flow, dataset, opt, sm=None):
     gen_feat = torch.FloatTensor(dataset.ntest_class * opt.number_sample, opt.X_dim)
     gen_label = np.zeros([0])
     with torch.no_grad():
-        for i in range(dataset.ntest_class):
-            text_feat = np.tile(dataset.test_att[i].astype('float32'), (opt.number_sample, 1))
-            text_feat = torch.from_numpy(text_feat).cuda()
-            if sm:
-                sr = sm(text_feat)
-            else:
-                sr = text_feat
-            z = torch.randn(opt.number_sample, dataset.train_feature.shape[1] - sr.shape[1]).cuda()
-            # z = z*z.norm(dim=-1, keepdim=True)
-            G_sample = flow.generation(torch.cat((sr, z), dim=1))
-            # G_sample = flow.reverse_sample(z, sr)
-            gen_feat[i * opt.number_sample:(i + 1) * opt.number_sample] = G_sample
-            gen_label = np.hstack((gen_label, np.ones([opt.number_sample]) * i))
+        if opt.dataset == 'cub2011':
+            for i in range(dataset.ntest_class):
+                text_feat = np.tile(dataset.test_att[i].astype('float32'), (opt.number_sample, 1))
+
+                text_feat = torch.from_numpy(text_feat).cuda()
+                if sm:
+                    sr = sm(text_feat)
+                else:
+                    sr = text_feat
+                z = torch.randn(opt.number_sample, dataset.train_feature.shape[1] - sr.shape[1]).cuda()
+                # z = z*z.norm(dim=-1, keepdim=True)
+                G_sample = flow.generation(torch.cat((sr, z), dim=1))
+                # G_sample = flow.reverse_sample(z, sr)
+                gen_feat[i * opt.number_sample:(i + 1) * opt.number_sample] = G_sample
+                gen_label = np.hstack((gen_label, np.ones([opt.number_sample]) * i))
+        else:
+            for i, class_id in enumerate(dataset.unseenclasses):
+                text_feat = np.tile(dataset.attribute[class_id.numel()], (opt.number_sample, 1))
+
+                text_feat = torch.from_numpy(text_feat).cuda()
+                if sm:
+                    sr = sm(text_feat)
+                else:
+                    sr = text_feat
+                z = torch.randn(opt.number_sample, dataset.train_feature.shape[1] - sr.shape[1]).cuda()
+                # z = z*z.norm(dim=-1, keepdim=True)
+                G_sample = flow.generation(torch.cat((sr, z), dim=1))
+                # G_sample = flow.reverse_sample(z, sr)
+                gen_feat[i * opt.number_sample:(i + 1) * opt.number_sample] = G_sample
+                gen_label = np.hstack((gen_label, np.ones([opt.number_sample]) * i))
+
     return gen_feat, torch.from_numpy(gen_label.astype(int))
 
 

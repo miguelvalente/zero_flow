@@ -1,6 +1,8 @@
 import numpy as np
+import pandas as pd
+import h5py
 import pickle
-import scipy.io as sio
+from scipy.io import loadmat
 from sklearn import preprocessing
 import torch
 
@@ -11,25 +13,33 @@ def map_label(label, classes):
 
     return mapped_label
 
+def select_indices(labels, classes):
+    assert labels.ndim == 1
+    if isinstance(classes, set):
+        classes = np.array(list(classes))
+    mask = np.isin(labels, test_elements=classes)
+    indices = np.where(mask)[0].astype(np.int64)
+    return indices
+
 class DATA_LOADER(object):
     def __init__(self, opt):
         if opt.dataset in ['FLO', 'cub2011']:
-            if 'easy' or 'hard' in opt.split:
-                self.read_easy(opt)
+            if 'easy' in opt.split or 'hard' in opt.split:
+                self.read_zsl(opt)
             else:
                 self.read(opt)
         else:
-            self.read_matdataset(opt)
+            self.read_imagenet(opt)
         self.index_in_epoch = 0
         self.epochs_completed = 0
         self.feature_dim = self.train_feature.shape[1]
-        self.att_dim = self.attribute.shape[1]
+        self.att_dim = self.attribute[1].shape[0] if isinstance(self.attribute, dict) else self.attribute.shape[1]
         self.text_dim = self.att_dim
         self.tr_cls_centroid = np.zeros([self.seenclasses.shape[0], self.feature_dim], np.float32)
         # for i in range(self.seenclasses.shape[0]):
         #     self.tr_cls_centroid[i] = np.mean(self.train_feature[self.train_label == i].numpy(), axis=0)
 
-    def read_easy(self, opt):
+    def read_zsl(self, opt):
         txt_feat_path = 'data/CIZSL/CUB2011/CUB_Porter_7551D_TFIDF_new.mat'
         # matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/data.mat")
         is_val = False
@@ -62,7 +72,7 @@ class DATA_LOADER(object):
 
         if is_val:
             # load .mat as numpy by scipy.io as sio, easy (8855, 3584) e.g.
-            data_features = sio.loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
+            data_features = loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
             # load .pkl label file
             with open(pfc_label_path_train) as fout:
                 data_labels = pickle.load(fout, encoding="latin1")
@@ -79,8 +89,8 @@ class DATA_LOADER(object):
             self.train_text_feature, self.test_text_feature = text_features[:train_cls_num], text_features[train_cls_num:]
             self.att_dim = self.train_text_feature.shape[1]
         else:
-            self.pfc_feat_data_train = sio.loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
-            self.pfc_feat_data_test = sio.loadmat(pfc_feat_path_test)['pfc_feat'].astype(np.float32)
+            self.pfc_feat_data_train = loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
+            self.pfc_feat_data_test = loadmat(pfc_feat_path_test)['pfc_feat'].astype(np.float32)
             # calculate the corresponding centroid.
             with open(pfc_label_path_train, 'rb') as fout1, open(pfc_label_path_test, 'rb') as fout2:
                 self.labels_train = pickle.load(fout1, encoding="latin1")
@@ -130,7 +140,7 @@ class DATA_LOADER(object):
     def read(self, opt):
         # matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/data.mat")
 
-        matcontent = sio.loadmat(opt.data_dir)
+        matcontent = loadmat(opt.data_dir)
 
         train_att = matcontent['att_train']
         seen_pro = matcontent['seen_pro']
@@ -148,8 +158,8 @@ class DATA_LOADER(object):
         # Image Features Normalization
         min_max_scaler = preprocessing.MinMaxScaler().fit(train_fea)
         train_fea = min_max_scaler.transform(train_fea)
-        test_seen_feature = min_max_scaler .transform(test_seen_fea)
-        test_unseen_feature = min_max_scaler .transform(test_unseen_fea)
+        test_seen_feature = min_max_scaler.transform(test_seen_fea)
+        test_unseen_feature = min_max_scaler.transform(test_unseen_fea)
 
         if opt.normalize_semantics:
             # Semantic Features Normalization
@@ -171,7 +181,7 @@ class DATA_LOADER(object):
         self.test_seen_feature = torch.from_numpy(test_seen_fea).float()
         self.test_unseen_feature = torch.from_numpy(test_unseen_fea).float()
 
-        matcontent = sio.loadmat('data/CUB_200_2011/mat/label.mat')
+        matcontent = loadmat('data/CUB_200_2011/mat/label.mat')
 
         train_idx = matcontent['train_idx'] - 1
         train_label = matcontent['train_label_new']
@@ -191,6 +201,75 @@ class DATA_LOADER(object):
 
         self.test_unseen_label = map_label(self.test_unseen_label, self.unseenclasses)
         self.test_seen_label = map_label(self.test_seen_label, self.seenclasses)
+
+    def read_imagenet(self, opt):
+        with h5py.File('/project/data/image_net/ILSVRC2012_res101_feature.mat', 'r') as f:
+            labels = np.array(f['labels'], dtype=np.int64).flatten()
+            labels_val = np.array(f['labels_val'], dtype=np.int64).flatten()
+
+            train_fea = np.array(f['features']).T
+            val_fea = np.array(f['features_val'])
+
+        text_att = loadmat('data/image_net/mat/text/albertxx_False.mat')
+        path = 'data/image_net/mat/text/ALBERT_ImageNet_trainval_classes_classes.pkl'
+        corre = pd.read_csv('data/image_net/wnid_correspondance.csv', sep=' ', names=['id', 'wnid'])
+        splits = loadmat('data/xlsa17/data/ImageNet/ImageNet_splits.mat')
+
+        seen = np.sort(splits['train_classes'].squeeze())
+        unseen = np.sort(splits['val_classes'].squeeze())
+
+        with open(path, 'rb') as f:
+            data = pickle.load(f)
+
+        all_train_classes = np.unique(splits['train_classes'])
+        val_classes = np.unique(splits['val_classes'])
+        train_seen_classes = set(data.keys()).intersection(all_train_classes)
+        val_classes_with_aux = set(data.keys()).intersection(val_classes)
+        predict_classes = val_classes_with_aux
+
+        seen_classes = train_seen_classes
+        unseen_classes = val_classes_with_aux
+
+        train_seen_indices = select_indices(labels, seen_classes)
+        val_seen_indices = select_indices(labels_val, seen_classes)
+        val_unseen_indices = select_indices(labels_val, unseen_classes)
+
+        train_fea = train_fea[train_seen_indices]
+        val_unseen_fea = val_fea[val_unseen_indices]
+        val_seen_fea = val_fea[val_seen_indices]
+
+        # Image Features Normalization
+        min_max_scaler = preprocessing.MinMaxScaler().fit(train_fea)
+        self.train_feature = torch.from_numpy(min_max_scaler.transform(train_fea)).float()
+        self.test_seen_feature = torch.from_numpy(min_max_scaler.transform(val_seen_fea)).float()
+        self.test_unseen_feature = torch.from_numpy(min_max_scaler.transform(val_unseen_fea)).float()
+
+        self.train_label = torch.from_numpy(labels[train_seen_indices].squeeze()).long()
+        self.test_seen_label = torch.from_numpy(labels_val[val_seen_indices].squeeze()).long()
+        self.test_unseen_label = torch.from_numpy(labels_val[val_unseen_indices].squeeze()).long()
+
+        self.seenclasses = torch.from_numpy(np.fromiter(seen_classes, int, len(seen_classes)))
+        self.unseenclasses = torch.from_numpy(np.fromiter(unseen_classes, int, len(unseen_classes)))
+        self.ntrain = self.train_feature.size()[0]
+        self.ntrain_class = self.seenclasses.size(0)
+        self.ntest_class = self.unseenclasses.size(0)
+        self.train_class = self.seenclasses.clone()
+        self.allclasses = torch.arange(0, self.ntrain_class + self.ntest_class).long()
+
+        self.test_unseen_label = map_label(self.test_unseen_label, self.unseenclasses)
+        self.test_seen_label = map_label(self.test_seen_label, self.seenclasses)
+
+        self.attribute = {}
+        train_attribute = []
+        for k, v in data.items():
+            self.attribute[k] = torch.from_numpy(v['feats']).float()
+            if k in seen_classes:
+                train_attribute.append(k)
+
+        self.train_att = text_att['train_att']
+        self.test_att = text_att['val_att']
+        self.attribute_to_idx = np.array(train_attribute)
+        # np.array(list(self.attribute.keys()))
 
 
 class FeatDataLayer(object):
@@ -239,15 +318,14 @@ class FeatDataLayer(object):
         return blobs
 
 def get_text_feature(dir, train_test_split_dir):
-    train_test_split = sio.loadmat(train_test_split_dir)
+    train_test_split = loadmat(train_test_split_dir)
     # get training text feature
     train_cid = train_test_split['train_cid'].squeeze()
-    text_feature = sio.loadmat(dir)['PredicateMatrix']
+    text_feature = loadmat(dir)['PredicateMatrix']
     train_text_feature = text_feature[train_cid - 1]  # 0-based index
 
     # get testing text feature
     test_cid = train_test_split['test_cid'].squeeze()
-    text_feature = sio.loadmat(dir)['PredicateMatrix']
+    text_feature = loadmat(dir)['PredicateMatrix']
     test_text_feature = text_feature[test_cid - 1]  # 0-based index
     return train_text_feature.astype(np.float32), test_text_feature.astype(np.float32)
-
