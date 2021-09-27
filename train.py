@@ -217,6 +217,7 @@ def train():
         run.log({"loss": loss.item()})
 
         loss.backward()
+        nn.utils.clip_grad_value_(flow.parameters(), 1.0)
         optimizer.step()
         if it % iters == 0:
             lr_scheduler.step()
