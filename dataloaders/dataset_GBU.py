@@ -243,6 +243,9 @@ class DATA_LOADER(object):
         self.train_feature = torch.from_numpy(min_max_scaler.transform(train_fea)).float()
         self.test_seen_feature = torch.from_numpy(min_max_scaler.transform(val_seen_fea)).float()
         self.test_unseen_feature = torch.from_numpy(min_max_scaler.transform(val_unseen_fea)).float()
+        # self.train_feature = torch.from_numpy((train_fea)).float()
+        # self.test_seen_feature = torch.from_numpy((val_seen_fea)).float()
+        # self.test_unseen_feature = torch.from_numpy((val_unseen_fea)).float()
 
         self.train_label = torch.from_numpy(labels[train_seen_indices].squeeze()).long()
         self.test_seen_label = torch.from_numpy(labels_val[val_seen_indices].squeeze()).long()
@@ -253,11 +256,11 @@ class DATA_LOADER(object):
         self.ntrain = self.train_feature.size()[0]
         self.ntrain_class = self.seenclasses.size(0)
         self.ntest_class = self.unseenclasses.size(0)
-        self.train_class = self.seenclasses.clone()
-        self.allclasses = torch.arange(0, self.ntrain_class + self.ntest_class).long()
+        # self.train_class = self.seenclasses.clone()
+        # self.allclasses = torch.arange(0, self.ntrain_class + self.ntest_class).long()
 
-        self.test_unseen_label = map_label(self.test_unseen_label, self.unseenclasses)
-        self.test_seen_label = map_label(self.test_seen_label, self.seenclasses)
+        # self.test_unseen_label = map_label(self.test_unseen_label, self.unseenclasses)
+        # self.test_seen_label = map_label(self.test_seen_label, self.seenclasses)
 
         self.attribute = {}
         train_attribute = []

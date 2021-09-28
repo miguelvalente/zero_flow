@@ -167,7 +167,7 @@ for epoch in range(1, config['epochs']):
             prototype_loss = config['wt_p_l'] * mse(x_, x_mean)
             prototype_loss.backward()
 
-        # nn.utils.clip_grad_value_(model.parameters(), 1.0)
+        nn.utils.clip_grad_value_(model.parameters(), 1.0)
         optimizer.step()
 
         if loss.isnan():

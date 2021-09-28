@@ -101,7 +101,7 @@ def synthesize_feature(flow, dataset, opt, sm=None):
                 gen_label = np.hstack((gen_label, np.ones([opt.number_sample]) * i))
         else:
             for i, class_id in enumerate(dataset.unseenclasses):
-                text_feat = np.tile(dataset.attribute[class_id.numel()], (opt.number_sample, 1))
+                text_feat = np.tile(dataset.attribute[int(class_id)], (opt.number_sample, 1))
 
                 text_feat = torch.from_numpy(text_feat).cuda()
                 if sm:

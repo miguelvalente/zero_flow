@@ -60,7 +60,7 @@ save_interval:
   value: 10000
 evl_interval:
   desc: eval interval
-  value: 100
+  value: 500
 manualSeed:
   desc: manual seed
   value: 6400

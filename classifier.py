@@ -25,6 +25,10 @@ class CLASSIFIER:
         self.test_unseen_feature = test_unseen_feature
         self.test_unseen_label = data_loader.test_unseen_label
 
+        if opt.dataset == 'imagenet':
+            self.test_unseen_label = torch.stack([torch.where(data_loader.unseenclasses == label)[0][0] 
+                                                 for label in self.test_unseen_label])
+
         self.seenclasses = data_loader.seenclasses
         self.unseenclasses = data_loader.unseenclasses
         self.ntrain_class = data_loader.ntrain_class
@@ -63,7 +67,6 @@ class CLASSIFIER:
     def fit_zsl(self):
         best_acc = 0
         mean_loss = 0
-        last_loss_epoch = 1e8
         for epoch in range(self.nepoch):
             for i in range(0, self.ntrain, self.batch_size):
                 self.model.zero_grad()
@@ -173,21 +176,6 @@ class CLASSIFIER:
             acc = (predicted_label.numpy() == test_label.numpy()).mean()
         return acc
 
-    def eval_MCA(self, preds, y):
-        cls_label = np.unique(y)
-        acc = list()
-        for i in cls_label:
-            acc.append((preds[y == i] == i).mean())
-        return np.asarray(acc).mean()
-
-    def compute_per_class_acc_gzsl(self, test_label, predicted_label, target_classes):
-        acc_per_class = 0
-        for i in target_classes:
-            idx = (test_label == i)
-            acc_per_class += torch.sum(test_label[idx] == predicted_label[idx]).float() / torch.sum(idx)
-        acc_per_class /= target_classes.size(0)
-        return acc_per_class
-
     # test_label is integer
     def val(self, test_X, test_label, target_classes):
         start = 0
@@ -206,8 +194,23 @@ class CLASSIFIER:
             acc = self.eval_MCA(predicted_label.numpy(), test_label.numpy())
         else:
             acc = (predicted_label.numpy() == test_label.numpy()).mean()
-        print(acc)
+        print(f'ZSL: Accuracy Unseen {acc * 100:.4f}')
         return acc
+
+    def eval_MCA(self, preds, y):
+        cls_label = np.unique(y)
+        acc = list()
+        for i in cls_label:
+            acc.append((preds[y == i] == i).mean())
+        return np.asarray(acc).mean()
+
+    def compute_per_class_acc_gzsl(self, test_label, predicted_label, target_classes):
+        acc_per_class = 0
+        for i in target_classes:
+            idx = (test_label == i)
+            acc_per_class += torch.sum(test_label[idx] == predicted_label[idx]).float() / torch.sum(idx)
+        acc_per_class /= target_classes.size(0)
+        return acc_per_class
 
     def compute_per_class_acc(self, test_label, predicted_label, nclass):
         acc_per_class = torch.FloatTensor(nclass).fill_(0)

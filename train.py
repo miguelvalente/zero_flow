@@ -108,10 +108,10 @@ def train():
 
     permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
     non_linearity = nn.PReLU(init=0.01)
-    hidden_dims = [input_dim] * 3
+    hidden_dims = [input_dim] * 2
 
     transform = []
-    for index in range(5):
+    for index in range(config.block_size):
         if True:
             transform.append(ActNormBijection(input_dim, data_dep_init=True))
         transform.append(permuter(input_dim))
@@ -125,6 +125,7 @@ def train():
     else:
         parameters = list(flow.parameters())
     print(flow)
+    print(sm)
 
     optimizer = optim.Adam(parameters,
                            lr=float(config.lr),
@@ -162,7 +163,8 @@ def train():
                 C = torch.from_numpy(C.astype('float32')).cuda()
         else:
             labels_d = np.array((labels.detach().cpu()))
-            C = torch.stack([dataset.attribute[i] for i in labels_d]).cuda()
+            C = np.stack([dataset.train_att[np.argmax(dataset.attribute_to_idx == i)] for i in labels_d])
+            C = torch.from_numpy(C.astype('float32')).cuda()
 
         X = torch.from_numpy(feat_data).cuda()
 
@@ -195,10 +197,7 @@ def train():
             sr = torch.from_numpy(dataset.train_att).cuda()
 
         if config.centralizing_loss > 0:
-            if config['dataset'] == 'cub2011':
-                centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label))
-            else:
-                centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label), dataset.attribute_to_idx)
+            centralizing_loss = flow.centralizing_loss(X, labels, sr.cuda(), torch.unique(dataset.test_seen_label))
             loss += centralizing_loss
             run.log({"loss_central": centralizing_loss.item()})
 
@@ -218,6 +217,7 @@ def train():
 
         loss.backward()
         nn.utils.clip_grad_value_(flow.parameters(), 1.0)
+        nn.utils.clip_grad_value_(sm.parameters(), 1.0)
         optimizer.step()
         if it % iters == 0:
             lr_scheduler.step()
@@ -225,7 +225,7 @@ def train():
             log_text = f'Iter-[{it}/{config.niter}]; loss: {loss.item():.3f}'
             log_print(log_text, log_dir)
 
-        if it % config.evl_interval == 0 and it >= 100:
+        if it % config.evl_interval == 0 and it >= 500:
             flow.eval()
             if config.relative_positioning:
                 sm.eval()
