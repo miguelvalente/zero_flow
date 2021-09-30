@@ -21,6 +21,7 @@ dependencies:
   - xz=5.2.5=h7b6447c_0
   - zlib=1.2.11=h7b6447c_3
   - pip:
+    - cached-property==1.5.2
     - chardet==4.0.0
     - click==8.0.1
     - configparser==5.0.2
@@ -29,13 +30,17 @@ dependencies:
     - filelock==3.0.12
     - flake8==3.9.2
     - freia==0.2
+    - future==0.18.2
+    - gdown==3.13.1
     - gensim==4.1.0
     - gitdb==4.0.7
     - gitpython==3.1.17
+    - h5py==3.4.0
     - huggingface-hub==0.0.16
     - idna==2.10
     - importlib-metadata==4.5.0
     - joblib==1.0.1
+    - mat73==0.52
     - mccabe==0.6.1
     - nltk==3.6.2
     - numpy==1.20.3
@@ -48,7 +53,9 @@ dependencies:
     - psutil==5.8.0
     - pycodestyle==2.7.0
     - pyflakes==2.3.1
+    - pymatreader==0.0.25
     - pyparsing==2.4.7
+    - pysocks==1.7.1
     - python-dateutil==2.8.1
     - pytz==2021.1
     - pyyaml==5.4.1
@@ -79,5 +86,6 @@ dependencies:
     - typing-extensions==3.10.0.0
     - urllib3==1.26.5
     - wandb==0.10.31
+    - xmltodict==0.12.0
     - zipp==3.4.1
 prefix: /opt/conda/envs/flow

@@ -29,7 +29,7 @@ from transform import Flow
 from utils import Result, log_print, save_model, synthesize_feature
 
 CUDA_LAUNCH_BLOCKING = 1
-os.environ['WANDB_MODE'] = 'online'
+os.environ['WANDB_MODE'] = 'dryrun'
 run = wandb.init(project='zero_flow_imagenet', entity='mvalente',
                  config=r'config/flow.yaml')
 
@@ -47,7 +47,7 @@ config = wandb.config
 
 wandb.config['dataset'] = 'imagenet'
 wandb.config['image_encoder'] = 'resnet101'
-wandb.config['text_encoder'] = 'albertxxl'
+wandb.config['text_encoder'] = 'glove'
 
 wandb.define_metric('Harmonic Mean', summary='max')
 wandb.define_metric('Accuracy Unseen', summary='max')
@@ -83,7 +83,7 @@ def train():
 
     dataset.feature_dim = dataset.train_feature.shape[1]
     data_layer = FeatDataLayer(dataset.train_label.numpy(), dataset.train_feature.cpu().numpy(), config)
-    config.niter = int(dataset.ntrain / config.batchsize) * config.epochs
+    config.niter = int((dataset.ntrain / config.batchsize) * config.epochs)
 
     result = Result()
     sim = cosine_similarity(dataset.train_att, dataset.train_att)
@@ -108,7 +108,7 @@ def train():
 
     permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
     non_linearity = nn.PReLU(init=0.01)
-    hidden_dims = [input_dim] * 2
+    hidden_dims = [input_dim] * config.hidden_dims
 
     transform = []
     for index in range(config.block_size):
@@ -126,7 +126,7 @@ def train():
         parameters = list(flow.parameters())
     print(flow)
     print(sm)
-
+    # run.watch((flow, sm))
     optimizer = optim.Adam(parameters,
                            lr=float(config.lr),
                            weight_decay=float(config.weight_decay))
@@ -141,7 +141,7 @@ def train():
     prototype_loss = 0
 
     x_mean = torch.from_numpy(dataset.tr_cls_centroid).cuda()
-    iters = math.ceil(dataset.ntrain / config.batchsize)
+    iters = math.ceil(dataset.ntrain / config.batchsize) 
     for it in tqdm.tqdm(range(start_step, config.niter + 1), desc='Iterations'):
         flow.zero_grad()
         if config.relative_positioning:

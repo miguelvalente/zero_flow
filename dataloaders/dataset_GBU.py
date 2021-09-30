@@ -210,8 +210,8 @@ class DATA_LOADER(object):
             train_fea = np.array(f['features']).T
             val_fea = np.array(f['features_val'])
 
-        text_att = loadmat('data/image_net/mat/text/albertxx_False.mat')
-        path = 'data/image_net/mat/text/ALBERT_ImageNet_trainval_classes_classes.pkl'
+        text_att = loadmat('data/image_net/mat/text/glove_False.mat')
+        path = 'data/image_net/mat/text/WordEmbeddings_Lo_glove.840B.300d_ImageNet_trainval_classes_classes.pkl'
         corre = pd.read_csv('data/image_net/wnid_correspondance.csv', sep=' ', names=['id', 'wnid'])
         splits = loadmat('data/xlsa17/data/ImageNet/ImageNet_splits.mat')
 
@@ -269,9 +269,16 @@ class DATA_LOADER(object):
             if k in seen_classes:
                 train_attribute.append(k)
 
-        self.train_att = text_att['train_att']
-        self.test_att = text_att['val_att']
+        self.train_att = text_att['train_att'].astype(np.float32)
+        self.test_att = text_att['val_att'].astype(np.float32)
         self.attribute_to_idx = np.array(train_attribute)
+
+        if opt.normalize_semantics:
+            # Semantic Features Normalization
+            min_max_scaler = preprocessing.MinMaxScaler().fit(self.train_att)
+            # std_scaler = preprocessing.StandardScaler().fit(self.train_att)
+            self.train_att = min_max_scaler .transform(self.train_att)
+            self.test_att = min_max_scaler.transform(self.test_att)
         # np.array(list(self.attribute.keys()))
 
 

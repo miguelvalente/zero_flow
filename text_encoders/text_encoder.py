@@ -13,6 +13,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer, TfidfTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 import nltk
+from tqdm import tqdm
 
 
 class TFIDF():
@@ -20,7 +21,7 @@ class TFIDF():
         self.config = config
         self.device = device
         self.cv = CountVectorizer()
-        self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=7000, ngram_range=(1, 2))
+        self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=None, ngram_range=(1, 2))
         self.lemmatizer = WordNetLemmatizer()
         self.stemmer = PorterStemmer()
         # nltk.download('punkt')
@@ -62,10 +63,10 @@ class TFIDF():
         vectors = self.tfidf_vectorizer.fit_transform(articles)
 
         term_value_pair = []
-        for v in vectors:
+        for v in tqdm(vectors[:10], desc='Getting top 10 terms and corresponding vectors'):
             df = pd.DataFrame(v.T.todense(), index=self.tfidf_vectorizer.get_feature_names(), columns=["tfidf"]) 
-            values = list(df.sort_values(by=["tfidf"], ascending=False).values[:10])
-            term = list(df.sort_values(by=["tfidf"], ascending=False).index[:10])
+            values = list(df.sort_values(by=["tfidf"], ascending=False).values)
+            term = list(df.sort_values(by=["tfidf"], ascending=False).index)
             term_value_pair.append((term, values))
 
         return np.array(vectors.todense()).astype(np.float32), term_value_pair
