@@ -60,7 +60,6 @@ def pickle_to_mat(path, config):
     sys.exit()
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 with open('config/dataloader.yaml', 'r') as d, open('config/context_encoder.yaml', 'r') as c:
     image_config = yaml.safe_load(d)
     text_config = yaml.safe_load(c)
@@ -75,38 +74,41 @@ else:
 image_mat_path = f"data/{dir_data}/mat/visual/{config['image_encoder']}.mat"
 text_mat_path = f"data/{dir_data}/mat/text/{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
 data_dic_path = f"data/{dir_data}/mat/{config['image_encoder']}_{config['split'][:-4]}_{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
+print(f"{data_dic_path}")
 
+easy_split_train = loadmat("data/cizsl/CUB2011/pfc_feat_train.mat")
+easy_split_test = loadmat("data/cizsl/CUB2011/pfc_feat_test.mat")
 # pickle_to_mat('asd', config)
 
 if os.path.exists(data_dic_path):
     print(f'\n{IDENTITY} {data_dic_path} already exists.')
     sys.exit()
 
-# if os.path.exists(image_mat_path):
-#     print(f'\n{IDENTITY} .mat exists. Loading {image_mat_path} instead of encoding images.')
-#     image_dic = loadmat(image_mat_path)
-# else:
-#     # image_encoder = ImageEncoder(config)
-#     if config['dataset'] == 'cub2011':
-#         image_dic = {'features': np.stack(image_encoder.features),
-#                      'seen_id': image_encoder.seen_id,
-#                      'unseen_id': image_encoder.unseen_id,
-#                      'train_loc': image_encoder.train_loc,
-#                      'test_seen_loc': image_encoder.test_seen_loc,
-#                      'test_unseen_loc': image_encoder.test_unseen_loc,
-#                      'image_config': image_config}
-#     else:
-#         with h5py.File('/project/data/image_net/ILSVRC2012_res101_feature.mat', 'r') as f:
-#             labels = np.array(f['labels'], dtype=np.int64).flatten()
-#             labels_val = np.array(f['labels_val'], dtype=np.int64).flatten()
+if os.path.exists(image_mat_path):
+    print(f'\n{IDENTITY} .mat exists. Loading {image_mat_path} instead of encoding images.')
+    image_dic = loadmat(image_mat_path)
+else:
+    image_encoder = ImageEncoder(config)
+    if config['dataset'] == 'cub2011':
+        image_dic = {'features': np.stack(image_encoder.features),
+                     'seen_id': image_encoder.seen_id,
+                     'unseen_id': image_encoder.unseen_id,
+                     'train_loc': image_encoder.train_loc,
+                     'test_seen_loc': image_encoder.test_seen_loc,
+                     'test_unseen_loc': image_encoder.test_unseen_loc,
+                     'image_config': image_config}
+    else:
+        with h5py.File('/project/data/image_net/ILSVRC2012_res101_feature.mat', 'r') as f:
+            labels = np.array(f['labels'], dtype=np.int64).flatten()
+            labels_val = np.array(f['labels_val'], dtype=np.int64).flatten()
 
-#             features = np.array(f['features'])
-#             features_val = np.array(f['features_val'])
-#         image_dic = {'features': features,
-#                      'features_val': features_val,
-#                      'labels': labels,
-#                      'labels_val': labels_val}
-#     savemat(image_mat_path, image_dic, format='4')
+            features = np.array(f['features'])
+            features_val = np.array(f['features_val'])
+        image_dic = {'features': features,
+                     'features_val': features_val,
+                     'labels': labels,
+                     'labels_val': labels_val}
+    savemat(image_mat_path, image_dic)
 
 if os.path.exists(text_mat_path):
     print(f'\n{IDENTITY} .mat exists. Loading {text_mat_path} instead of encoding text.')
@@ -118,7 +120,7 @@ else:
             label = loadmat('data/CUB_200_2011/mat/label.mat')
             semantic_distribution = SemanticDistribution(torch.tensor(context_encoder.attributes), torch.ones(context_encoder.attributes.shape[1]))
             att_train = torch.stack([semantic_distribution.sample(num_samples=1, n_points=1, context=l[0]).reshape(1, -1) 
-                                    for l in label['train_idx'] - 1]).squeeze()
+                                     for l in label['train_idx'] - 1]).squeeze()
             semantic_dic = {'features': context_encoder.attributes,
                             'text_config': text_config,
                             'att_train': np.array(att_train)}
@@ -127,10 +129,10 @@ else:
                             'text_config': text_config}
     else:
         pass
-    # savemat(text_mat_path, semantic_dic)
+    savemat(text_mat_path, semantic_dic)
 
 if config['dataset'] == "cub2011":
-    data = loadmat("data/data/CUB/data.mat")
+    # data = loadmat("data/data/CUB/data.mat")
     data_dic = {'att_train': 0,  # np.array(semantic_dic['att_train']),
                 'attribute': semantic_dic['features'],
                 'seen_pro': np.squeeze(semantic_dic['features'][image_dic['seen_id'] - 1]),
@@ -150,4 +152,4 @@ else:
 with open(f"{data_dic_path[:-3]}yaml", "w") as f:
     yaml.dump(config, f)
 print(f'\n{IDENTITY} .mat file saved to:  {data_dic_path}')
-# savemat(data_dic_path, data_dic)
+savemat(data_dic_path, data_dic)

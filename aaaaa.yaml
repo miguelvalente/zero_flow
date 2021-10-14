@@ -1,0 +1,14 @@
+data_mat: a
+dataset: cub2011
+glove_dir: /project/data/glove.840B.300d.txt
+image_encoder: resnet50d
+label_mat: a
+load_precomputed_visual: true
+preprocess_text: false
+save_text_features: data/CUB_200_2011/mat/text/
+save_visual_features: data/CUB_200_2011/mat/visual/
+semantic_sampling: false
+split: proposed_split.txt
+stop_word: true
+text_encoder: tfidf_7000
+weighted_encoding: false

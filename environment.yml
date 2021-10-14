@@ -29,7 +29,6 @@ dependencies:
     - einops==0.3.2
     - filelock==3.0.12
     - flake8==3.9.2
-    - freia==0.2
     - future==0.18.2
     - gdown==3.13.1
     - gensim==4.1.0

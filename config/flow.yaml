@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 1.2
+  value: 100
 batchsize:
   desc: Size of each batch
   value: 128
@@ -12,7 +12,7 @@ block_size:
   value: 5
 hidden_dims:
   desc: Number of hidden dims
-  value: 6
+  value: 1
 permuter:
   desc: type of permutation
   value: LinearLU # manual reverse random manual
@@ -51,7 +51,7 @@ classifier_lr:
   value: 0.005
 number_sample:
   desc: number features to generate per class
-  value: 4000
+  value: 600
 disp_interval:
   desc: interval
   value: 100

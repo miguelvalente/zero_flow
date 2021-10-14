@@ -3,6 +3,7 @@
         "dists",
         "dtype",
         "has",
+        "laodmat",
         "numpy",
         "optim",
         "pyplot",
@@ -23,7 +24,6 @@
     "python.linting.mypyEnabled": false,
     "python.linting.pycodestyleArgs": ["--ignore=E303"],
     "python.linting.enabled": true,
-    "python.dataScience.debugJustMyCode": false,
     "git.ignoreLimitWarning": true,
     "python.linting.flake8Enabled": true,
     "python.linting.flake8Args": [
@@ -40,5 +40,6 @@
         "densenn",
         "losses"
     ],
+    "jupyter.debugJustMyCode": false,
 }
 

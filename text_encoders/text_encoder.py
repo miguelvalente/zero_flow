@@ -21,7 +21,7 @@ class TFIDF():
         self.config = config
         self.device = device
         self.cv = CountVectorizer()
-        self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=None, ngram_range=(1, 2))
+        self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=7000, ngram_range=(1, 2))
         self.lemmatizer = WordNetLemmatizer()
         self.stemmer = PorterStemmer()
         # nltk.download('punkt')

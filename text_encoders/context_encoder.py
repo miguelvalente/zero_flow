@@ -30,7 +30,7 @@ class ContextEncoder():
         self.config = config
         self.device = device
 
-        if self.config['weigthed_encoding']:
+        if self.config['weighted_encoding']:
             self.tfidf = TFIDF(self.config, device=self.device)
 
         if 'tfidf' in self.config['text_encoder']:
@@ -54,9 +54,9 @@ class ContextEncoder():
             raise Exception
 
         if self.config['dataset'] == 'imagenet':
-            self._encode_contexts_imagenet(weigthed_encoding=self.config['text_encoder'])
+            self._encode_contexts_imagenet(weighted_encoding=self.config['weighted_encoding'])
         elif self.config['dataset'] == 'cub2011':
-            self._encode_contexts_cub2011(weigthed_encoding=self.config['text_encoder'])
+            self._encode_contexts_cub2011(weighted_encoding=self.config['weighted_encoding'])
         else:
             print(f"{IDENTITY} Dataset not found")
             raise Exception
@@ -74,7 +74,7 @@ class ContextEncoder():
 
         return articles
 
-    def _encode_contexts_cub2011(self, weigthed_encoding=False):
+    def _encode_contexts_cub2011(self, weighted_encoding=False):
         wiki_dir = 'data/CUBird_WikiArticles'
 
         file_list = next(os.walk(wiki_dir), (None, None, []))[2]
@@ -85,7 +85,7 @@ class ContextEncoder():
         if self.config['preprocess_text']:
             articles = self._pre_process_articles(articles)
 
-        if weigthed_encoding:
+        if weighted_encoding:
             _, term_value = self.tfidf(articles)
             self.attributes = np.stack([(self.text_encoder(terms)).mean(axis=0)
                                        for terms, values in term_value]).astype(np.float32)
@@ -101,7 +101,7 @@ class ContextEncoder():
                     contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
                 self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
 
-    def _encode_contexts_imagenet(self, weigthed_encoding=False):
+    def _encode_contexts_imagenet(self, weighted_encoding=False):
         class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
         articles_dir = "data/ImageNet-Wiki_dataset/class_article_text_descriptions/class_article_text_descriptions_trainval.pkl"
 

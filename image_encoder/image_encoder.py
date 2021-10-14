@@ -54,7 +54,7 @@ class ImageEncoder():
         self.transform.transforms = self.transform.transforms[:-1]
 
     def _encode_cub2011(self):
-        cub = Cub2011(config=self.config, root='/project/data/')
+        cub = Cub2011(config=self.config, root='data/')
 
         self.seen_id = cub.seen_id
         self.unseen_id = cub.unseen_id
