@@ -37,8 +37,8 @@ class ImageNet(Dataset):
             return False
 
     def _load_metadata(self):
-        self.wnid_to_id = pd.read_csv('data/image_net/wnid_correspondance.csv', sep=' ', names=['id', 'wnid'])
-        self.splits = loadmat('data/xlsa17/data/ImageNet/ImageNet_splits.mat')
+        # self.wnid_to_id = pd.read_csv('data/image_net/wnid_correspondance.csv', sep=' ', names=['id', 'wnid'])
+        self.splits = loadmat('data/image_net/ImageNet_splits.mat')
         self.seen_id = np.sort(self.splits['train_classes'].squeeze())
         self.unseen_id = np.sort(self.splits['val_classes'].squeeze())
 
@@ -52,4 +52,3 @@ class ImageNet(Dataset):
         img_paths_train = list(it.chain(*img_paths_train))
         img_paths_val = list(it.chain(*img_paths_val))
         self.img_paths = img_paths_val + img_paths_train
-

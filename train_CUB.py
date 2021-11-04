@@ -30,32 +30,32 @@ from utils import Result, log_print, save_model, synthesize_feature
 
 #CUDA_LAUNCH_BLOCKING = 1
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-os.environ['WANDB_MODE'] = 'online'
-run = wandb.init(project='zero_flow_imagenet', entity='mvalente',
-                 config=r'config/flow.yaml')
+os.environ['WANDB_MODE'] = 'dryrun'
+run = wandb.init(project='zero_flow_CUB', entity='mvalente',
+                 config=r'config/flow_cub.yaml')
 
 config = wandb.config
-# with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
-#     temp = yaml.safe_load(y)
-#     wandb.config['image_encoder'] = 'cizsl'
-#     wandb.config['text_encoder'] = 'cizsl'
-#     # wandb.config['image_encoder'] = 'cizsl' temp['image_encoder']
-#     # wandb.config['text_encoder'] = 'cizsl'temp['text_encoder']
-#     # wandb.config['split'] = temp['split']
-#     wandb.config['split'] = 'hard'
-#     wandb.config['dataset'] = temp['dataset']
-#     del temp
-
-config = wandb.config
-with open(config.imagenet_text_encode, 'r') as f:
-    temp = yaml.safe_load(f)
-    wandb.config['image_encoder'] = 'resnet101'
-    wandb.config['dataset'] = 'image_net'
+with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
+    temp = yaml.safe_load(y)
+    # wandb.config['image_encoder'] = 'cizsl'
+    # wandb.config['text_encoder'] = 'cizsl'
+    # wandb.config['split'] = 'hard'
+    wandb.config['image_encoder'] = temp['image_encoder']
     wandb.config['text_encoder'] = temp['text_encoder']
+    wandb.config['split'] = temp['split']
+    wandb.config['dataset'] = temp['dataset']
+    del temp
 
-wandb.define_metric('Harmonic Mean', summary='max')
+# config = wandb.config
+# with open(config.imagenet_text_encode, 'r') as f:
+#     temp = yaml.safe_load(f)
+#     wandb.config['image_encoder'] = 'resnet101'
+#     wandb.config['dataset'] = 'image_net'
+#     wandb.config['text_encoder'] = temp['text_encoder']
+
+# wandb.define_metric('Harmonic Mean', summary='max')
 wandb.define_metric('Accuracy Unseen', summary='max')
-wandb.define_metric('Accuracy Seen', summary='max')
+# wandb.define_metric('Accuracy Seen', summary='max')
 
 #  os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 wandb.config.manualSeed = random.randint(1, 10000)

@@ -20,6 +20,7 @@ class Cub2011(Dataset):
     base_folder = 'CUB_200_2011/images'
     url = 'http://www.vision.caltech.edu/visipedia-data/CUB-200-2011/CUB_200_2011.tgz'
     filename = 'CUB_200_2011.tgz'
+    tgz_md5 = '97eceeb196236b17998738112f37df78'
 
     def __init__(self, root, encoder=None, config=None, download=False):
         self.root = os.path.expanduser(root)
@@ -36,10 +37,6 @@ class Cub2011(Dataset):
 
     def _download(self):
         import tarfile
-
-        if self._check_integrity():
-            print('Files already downloaded and verified')
-            return
 
         download_url(self.url, self.root, self.filename, self.tgz_md5)
 
@@ -73,6 +70,11 @@ class Cub2011(Dataset):
 
             self.seen_id = self.data[self.data['seen_unseen'] == 1].target.unique()
             self.unseen_id = self.data[self.data['seen_unseen'] == 0].target.unique()
+            self.train_loc = self.data[self.data['split'] == 1].img_id.values
+            self.validate_loc = self.data[self.data['split'] == 0].img_id.values
+            self.test_unseen_loc = self.data[(self.data.split == 0) & (self.data.seen_unseen == 0)].img_id.values
+            self.test_seen_loc = self.data[(self.data.split == 0) & (self.data.seen_unseen == 1)].img_id.values
+            self.targets = self.data.target.values
         else:
             train_test_split = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', self.config['split']),
                                            sep=' ', names=['img_id', 'split'])
@@ -81,11 +83,11 @@ class Cub2011(Dataset):
             self.data = data.merge(train_test_split, on='img_id')
             self.img_paths = [os.path.join(self.root, self.base_folder, img) for img in self.data['filepath']]  # Maybe.tolist()
 
-            self.seen_id = self.data[self.data['seen_unseen'] == 1].target.unique()
-            self.unseen_id = self.data[self.data['seen_unseen'] == 0].target.unique()
+            self.seen_id = 0
+            self.unseen_id = 0
 
-        self.train_loc = self.data[self.data['split'] == 1].img_id.values
-        self.validate_loc = self.data[self.data['split'] == 0].img_id.values
-        self.test_unseen_loc = self.data[(self.data.split == 0) & (self.data.seen_unseen == 0)].img_id.values
-        self.test_seen_loc = self.data[(self.data.split == 0) & (self.data.seen_unseen == 1)].img_id.values
-        self.targets = self.data.target.values
+            self.train_loc = self.data[self.data['split'] == 1].img_id.values
+            self.validate_loc = self.data[self.data['split'] == 0].img_id.values
+            self.test_unseen_loc = 0
+            self.test_seen_loc = 0
+            self.targets = self.data.target.values

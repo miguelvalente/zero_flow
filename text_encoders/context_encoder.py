@@ -65,17 +65,17 @@ class ContextEncoder():
         articles = [re.sub(r'\d+', '', art.lower()).translate(str.maketrans('', '', string.punctuation))
                     for art in _articles]
 
-        if self.config['stop_word']:
-            clean_articles = []
-            cleaner = tqdm(articles, desc=f'{IDENTITY} Removing all stopwords')
-            for art in cleaner:
-                clean_articles.append(" ".join([word for word in art.split() if word not in stopwords.words('english')]))
-            articles = clean_articles
+        nltk.download('stopwords')
+        clean_articles = []
+        cleaner = tqdm(articles, desc=f'{IDENTITY} Removing all stopwords')
+        for art in cleaner:
+            clean_articles.append(" ".join([word for word in art.split() if word not in stopwords.words('english')]))
+        articles = clean_articles
 
         return articles
 
     def _encode_contexts_cub2011(self, weighted_encoding=False):
-        wiki_dir = 'data/CUBird_WikiArticles'
+        wiki_dir = 'data/CUB_200_2011/CUBird_WikiArticles'
 
         file_list = next(os.walk(wiki_dir), (None, None, []))[2]
         file_list_id = [int(file.split('.')[0]) for file in file_list]
@@ -102,22 +102,17 @@ class ContextEncoder():
                 self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
 
     def _encode_contexts_imagenet(self, weighted_encoding=False):
-        class_ids_dir = "data/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
-        articles_dir = "data/ImageNet-Wiki_dataset/class_article_text_descriptions/class_article_text_descriptions_trainval.pkl"
+        class_ids_dir = "data/image_net/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
+        articles_dir = "data/image_net/ImageNet-Wiki_dataset/class_article_text_descriptions/class_article_text_descriptions_trainval.pkl"
 
-        a, articles = self._article_correspondences(class_ids_dir, articles_dir)
-
-        image_net_dir = 'data/image_net/train'  # self.config['image_net_dir']
-
-        articles_id = [key for key, value in articles.items()]
-        tiny_ids = [dirs for _, dirs, _ in os.walk(image_net_dir)][0]
-        articles_id = list(set(articles_id).intersection(tiny_ids))
-
-        articles = [articles[art_id] for art_id in articles_id]
+        self.wnid_correspondance, articles = self._article_correspondences(class_ids_dir, articles_dir)
 
         path = 'data/image_net/mat/text/WordEmbeddings_Lo_glove.840B.300d_ImageNet_trainval_classes_classes.pkl'
         with open(path, 'rb') as f:
             data = pickle.load(f)
+
+        articles_id = [value['wnid'] for _, value in data.items()]
+        articles = [articles[art_id] for art_id in articles_id]
 
         concat_articles = []
         for article in articles:
@@ -125,19 +120,27 @@ class ContextEncoder():
                 concat_articles.append(re.sub('[\n]+', '\n', article[0]))
             else:
                 concat_articles.append(re.sub('[\n]+', '\n', '\n'.join(article)))
+        articles = concat_articles
 
         if self.config['preprocess_text']:
             articles = self._pre_process_articles(concat_articles)
 
-        if 'tfidf' in self.config['text_encoder']:
-            self.attributes, self.term_value_pair = self.text_encoder(articles)
+        if weighted_encoding:
+            _, term_value = self.tfidf(articles)
+            term_value_bar = tqdm(articles, desc=f'{IDENTITY} Encoding All Semantic Descriptions ImageNet')
+            self.attributes = np.stack([(self.text_encoder(terms)).mean(axis=0)
+                                       for terms, values in term_value_bar]).astype(np.float32)
+                # 2 options:
+                # - encode all as one
+                # - encode each word separatly and weigth it
         else:
-            semantic = tqdm(articles, desc=f'{IDENTITY} Encoding All Semantic Descriptions CUB2011')
-            with torch.no_grad():
-                contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
-            self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
-
-        print()
+            if 'tfidf' in self.config['text_encoder']:
+                self.attributes, self.term_value_pair = self.text_encoder(articles)
+            else:
+                semantic = tqdm(articles, desc=f'{IDENTITY} Encoding All Semantic Descriptions ImageNet')
+                with torch.no_grad():
+                    contexts = [torch.tensor((self.text_encoder(article))).type(torch.float32) for article in semantic]
+                self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
 
     def _article_correspondences(self, class_article_correspondences_path, class_article_text_descriptions_path):
         articles = pickle.load(
@@ -149,6 +152,6 @@ class ContextEncoder():
 
         with open(class_article_correspondences_path, 'r') as file:
             reader = csv.reader(file)
-            article_correspondences = {item[0]: item[1:] for item in reader}  # Make a dictionary out of the csv {wnid: classes}
+            article_correspondences = {item[0]: idx for idx, item in enumerate(reader)}  # Make a dictionary out of the csv {wnid: classes}
 
         return article_correspondences, articles

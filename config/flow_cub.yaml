@@ -1,18 +1,18 @@
 epochs:
   desc: Number of epochs to train over
-  value: 1.25 
+  value: 100
 batchsize:
   desc: Size of each batch
-  value: 128
+  value: 256
 lr:
   desc: Learning rate
   value: 0.0003
 block_size:
   desc: Number of blocks
-  value: 10
+  value: 5
 hidden_dims:
   desc: Number of hidden dims
-  value: 1
+  value: 2
 permuter:
   desc: type of permutation
   value: LinearLU # manual reverse random manual
@@ -60,11 +60,10 @@ save_interval:
   value: 10000
 evl_interval:
   desc: eval interval
-  value: 500
+  value: 250
 semantic_vector_dim:
   desc: Dimension of semantic vectors
   value: 1024
-  # value: 1024
 pi:
   desc: degree of the perturbation
   value: 0
@@ -92,8 +91,6 @@ relative_positioning:
 normalize_semantics:
   desc: To normalize semantics
   value: False
-imagenet_text_encode:
-  value: data/image_net/mat/text/tfidf_full_False.yaml
 data_dir:
   desc: data directory
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_tf_idf_mean_False.mat
@@ -101,7 +98,7 @@ data_dir:
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_full_stop_bigram_7000_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_full_stop_bigram_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_5000_False.mat
-  value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_7000_False.mat
+  value: data/CUB_200_2011/mat/resnet50d_easy_split_tfidf_False.mat # data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_7000_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_unfiltered_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_cleanedup_False.mat
   # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_porter755_False.mat

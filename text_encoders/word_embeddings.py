@@ -59,7 +59,7 @@ class WordEmbeddings:
         self.emb, self.emb_dim = load_embeddings(self.emb_file)
 
         #  uncomment to download
-        # stanza.download('en')
+        stanza.download('en')
         self.tokenizer = stanza.Pipeline('en', processors='tokenize')
 
     def __call__(self, text):

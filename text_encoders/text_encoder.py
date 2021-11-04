@@ -21,7 +21,8 @@ class TFIDF():
         self.config = config
         self.device = device
         self.cv = CountVectorizer()
-        self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=7000, ngram_range=(1, 2))
+        self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, ngram_range=(1, 1))
+        # self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=20000, ngram_range=(1, 1))
         self.lemmatizer = WordNetLemmatizer()
         self.stemmer = PorterStemmer()
         # nltk.download('punkt')
@@ -63,15 +64,16 @@ class TFIDF():
         vectors = self.tfidf_vectorizer.fit_transform(articles)
 
         term_value_pair = []
-        for v in tqdm(vectors[:10], desc='Getting top 10 terms and corresponding vectors'):
-            df = pd.DataFrame(v.T.todense(), index=self.tfidf_vectorizer.get_feature_names(), columns=["tfidf"]) 
-            values = list(df.sort_values(by=["tfidf"], ascending=False).values)
-            term = list(df.sort_values(by=["tfidf"], ascending=False).index)
-            term_value_pair.append((term, values))
+        if self.config['weighted_encoding']:
+            for v in tqdm(vectors, desc='Ordering top terms and corresponding vectors'):
+                df = pd.DataFrame(v.T.todense(), index=self.tfidf_vectorizer.get_feature_names(), columns=["tfidf"]) 
+                values = list(df.sort_values(by=["tfidf"], ascending=False).values)
+                term = list(df.sort_values(by=["tfidf"], ascending=False).index)
+                term_value_pair.append((term, values))
 
         return np.array(vectors.todense()).astype(np.float32), term_value_pair
 
-    def _tokenize(articles):
+    def _tokenize(self, articles):
         preprocessed = []
         preprocessed.append(' '.join([self.stemmer.stem(item) for item in filtered]))
         tokens = nltk.word_tokenize(articles)
@@ -229,7 +231,6 @@ class ProphetNet(BaseEncoder):
         outputs = self.model(input_ids=inputs['input_ids'], attention_mask=inputs['attention_mask'])
 
         return self.extract_text_summary(outputs['last_hidden_state'], inputs['attention_mask'])
-
 
 class AlbertEncoder(BaseEncoder):
     def __init__(self, config, device):
