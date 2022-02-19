@@ -1,4 +1,4 @@
-from transform import Transform
+from models.transform import Transform
 import torch
 import torch.nn as nn
 import einops

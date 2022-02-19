@@ -4,12 +4,11 @@ import sys
 
 import numpy as np
 import torch
-import tqdm
 import yaml
-import h5py 
+import h5py
 from scipy.io import loadmat, savemat
 
-from distributions import SemanticDistribution
+from models.distributions import SemanticDistribution
 from image_encoder.image_encoder import ImageEncoder
 from text_encoders.context_encoder import ContextEncoder
 import pandas as pd
@@ -193,12 +192,12 @@ else:
                         'wnid_test': wnid_att_test,
                         'text_config': text_config}
     path = 'data/image_net/mat/text/ALBERT_ImageNet_trainval_classes_classes.pkl'
-    # savemat(text_mat_path, semantic_dic)
-    # with open(f"{text_mat_path[:-3]}yaml", "w") as f:
-        # yaml.dump(config, f)
+    savemat(text_mat_path, semantic_dic)
+    with open(f"{text_mat_path[:-3]}yaml", "w") as f:
+        yaml.dump(config, f)
 
 if config['dataset'] == "cub2011":
-    # data = loadmat("data/data/CUB/data.mat")
+    data = loadmat("data/data/CUB/data.mat")
     data_dic = {'att_train': 0,  # np.array(semantic_dic['att_train']),
                 'attribute': semantic_dic['features'],
                 'seen_pro': np.squeeze(semantic_dic['features'][image_dic['seen_id'] - 1]),

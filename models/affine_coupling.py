@@ -1,8 +1,8 @@
 
 import torch
 from torch import nn
-from nets import MLP
-from transform import Transform
+from models.nets import MLP
+from models.transform import Transform
 
 class AffineCoupling(Transform):
     def __init__(self, input_dim, hidden_dims, non_linearity, context_dim=0,

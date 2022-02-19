@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from transform import Transform
+from models.transform import Transform
 import numpy as np
 
 class Permuter(Transform):

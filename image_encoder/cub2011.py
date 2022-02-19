@@ -1,15 +1,8 @@
-import itertools as it
 import os
-from collections import Counter
 
-import numpy.random as random
 import pandas as pd
-import torch
-from scipy.io import loadmat, savemat
-from torchvision.datasets.utils import download_url
-from tqdm import tqdm
 from torch.utils.data import Dataset
-import numpy as np
+from torchvision.datasets.utils import download_url
 
 IDENTITY = 'CUB Encoder| '
 

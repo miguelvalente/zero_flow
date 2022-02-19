@@ -1,6 +1,4 @@
-import argparse
 import glob
-import json
 import math
 import os
 import random
@@ -11,23 +9,15 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.distributions as dist
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
 import yaml
-from scipy.io import loadmat, savemat
 from sklearn.metrics.pairwise import cosine_similarity
-from nets import LinearModule, GSModule
 
-import classifier
 import wandb
-from act_norm import ActNormBijection
-from affine_coupling import AffineCoupling
+import models
 from dataloaders.dataset_GBU import DATA_LOADER, FeatDataLayer
-from distributions import DoubleDistribution, SemanticDistribution
-from permuters import LinearLU, Permuter, Reverse
-from transform import Flow
-from utils import Result, log_print, save_model, synthesize_feature
+import utils
 
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -84,7 +74,7 @@ def train():
     config.niter = int((dataset.ntrain / config.batchsize) * config.epochs)
     print(f'Each epoch has {int(dataset.ntrain / config.batchsize)} iterations')
 
-    result = Result()
+    result = utils.Result()
     sim = cosine_similarity(dataset.train_att, dataset.train_att)
     min_idx = np.argmin(sim.sum(-1))
     min = dataset.train_att[min_idx]
@@ -101,25 +91,25 @@ def train():
         context_dim = dataset.train_att.shape[1]
     split_dim = input_dim - context_dim
 
-    semantic_distribution = SemanticDistribution(torch.tensor(dataset.train_att).to(device), torch.ones(context_dim).to(device))
+    semantic_distribution = models.SemanticDistribution(torch.tensor(dataset.train_att).to(device), torch.ones(context_dim).to(device))
     visual_distribution = dist.MultivariateNormal(torch.zeros(split_dim).to(device), torch.eye(split_dim).to(device))
-    base_dist = DoubleDistribution(visual_distribution, semantic_distribution, input_dim, context_dim)
+    base_dist = models.DoubleDistribution(visual_distribution, semantic_distribution, input_dim, context_dim)
 
-    permuter = lambda dim: LinearLU(num_features=dim, eps=1.0e-5)
+    permuter = lambda dim: models.LinearLU(num_features=dim, eps=1.0e-5)
     non_linearity = nn.PReLU(init=0.01)
     hidden_dims = [input_dim] * config.hidden_dims
 
     transform = []
     for index in range(config.block_size):
         if True:
-            transform.append(ActNormBijection(input_dim, data_dep_init=True))
+            transform.append(models.ActNormBijection(input_dim, data_dep_init=True))
         transform.append(permuter(input_dim))
-        transform.append(AffineCoupling(input_dim, hidden_dims, non_linearity=non_linearity))
+        transform.append(models.AffineCoupling(input_dim, hidden_dims, non_linearity=non_linearity))
 
-    flow = Flow(transform, base_dist).to(device)
+    flow = models.Flow(transform, base_dist).to(device)
 
     if config.relative_positioning:
-        sm = GSModule(vertices, context_dim).to(device)
+        sm = models.GSModule(vertices, context_dim).to(device)
         parameters = list(flow.parameters()) + list(sm.parameters())
     else:
         parameters = list(flow.parameters())
@@ -222,66 +212,66 @@ def train():
             lr_scheduler.step()
         if it % config.disp_interval == 0 and it:
             log_text = f'Iter-[{it}/{config.niter}]; loss: {loss.item():.3f}'
-            log_print(log_text, log_dir)
+            utils.log_print(log_text, log_dir)
 
         if it % config.evl_interval == 0 and it >= 20:
             flow.eval()
             if config.relative_positioning:
                 sm.eval()
-                gen_feat, gen_label = synthesize_feature(flow, dataset, config, sm)
+                gen_feat, gen_label = utils.synthesize_feature(flow, dataset, config, sm)
             else:
-                gen_feat, gen_label = synthesize_feature(flow, dataset, config)
+                gen_feat, gen_label = utils.synthesize_feature(flow, dataset, config)
 
             # """ GZSL """
             if config.gzsl:
                 train_X = torch.cat((dataset.train_feature, gen_feat), 0)
                 train_Y = torch.cat((dataset.train_label, gen_label + dataset.ntrain_class), 0)
 
-                cls = classifier.CLASSIFIER(run, config, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
-                                            dataset.ntrain_class + dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, config.gzsl)
+                cls = models.CLASSIFIER(run, config, train_X, train_Y, dataset, dataset.test_seen_feature, dataset.test_unseen_feature,
+                                        dataset.ntrain_class + dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, config.gzsl)
 
                 result.update_gzsl(it, cls.acc_seen, cls.acc_unseen, cls.H)
 
-                log_print("GZSL Softmax:", log_dir)
-                log_print(f"U->T {cls.acc_unseen:.2f}  S->T {cls.acc_seen:.2f}  H {cls.H:.2f}"
-                          f" Best_H [{result.best_acc_U_T:.2f} {result.best_acc_S_T:.2f} {result.best_acc:.2f}]"
-                          f"| Iter-{result.best_iter}]", log_dir)
+                utils.log_print("GZSL Softmax:", log_dir)
+                utils.log_print(f"U->T {cls.acc_unseen:.2f}  S->T {cls.acc_seen:.2f}  H {cls.H:.2f}"
+                                f" Best_H [{result.best_acc_U_T:.2f} {result.best_acc_S_T:.2f} {result.best_acc:.2f}]"
+                                f"| Iter-{result.best_iter}]", log_dir)
 
                 if result.save_model:
                     files2remove = glob.glob(out_dir + '/Best_model_GZSL_*')
                     for _i in files2remove:
                         os.remove(_i)
-                    save_model(it, flow, sm, config.manualSeed, log_text,
-                               f"{out_dir}/Best_model_GZSL_H_{result.best_acc:.2f}_S_{result.best_acc_S_T:.2f}_U_{result.best_acc_U_T:.2f}.tar")
+                    utils.save_model(it, flow, sm, config.manualSeed, log_text,
+                                     f"{out_dir}/Best_model_GZSL_H_{result.best_acc:.2f}_S_{result.best_acc_S_T:.2f}_U_{result.best_acc_U_T:.2f}.tar")
             # """ ZSL """
             else:
                 train_X = gen_feat
                 train_Y = gen_label
-                cls = classifier.CLASSIFIER(run, config, train_X, train_Y, dataset, dataset.test_unseen_feature, dataset.test_unseen_feature,
-                                            dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, config.gzsl)
+                cls = models.CLASSIFIER(run, config, train_X, train_Y, dataset, dataset.test_unseen_feature, dataset.test_unseen_feature,
+                                        dataset.ntest_class, True, config.classifier_lr, 0.5, 30, 3000, config.gzsl)
 
                 result.update(it, cls.acc)
-                log_print("ZSL Softmax:", log_dir)
-                log_print(f"Best_Accuracy [{result.best_acc:.2f} | Iter-{result.best_iter}]", log_dir)
+                utils.log_print("ZSL Softmax:", log_dir)
+                utils.log_print(f"Best_Accuracy [{result.best_acc:.2f} | Iter-{result.best_iter}]", log_dir)
 
                 if result.save_model:
                     files2remove = glob.glob(out_dir + '/Best_model_ZSL_*')
                     for _i in files2remove:
                         os.remove(_i)
-                    save_model(it, flow, sm, config.manualSeed, log_text,
-                               f"{out_dir}/Best_model_ZSL_Acc_{result.best_acc:.2f}_.tar")
+                    utils.save_model(it, flow, sm, config.manualSeed, log_text,
+                                     f"{out_dir}/Best_model_ZSL_Acc_{result.best_acc:.2f}_.tar")
 
             flow.train()
             if config.relative_positioning:
                 sm.train()
                 if it % config.save_interval == 0 and it:
-                    save_model(it, flow, sm, config.manualSeed, log_text,
-                               out_dir + '/Iter_{:d}.tar'.format(it))
+                    utils.save_model(it, flow, sm, config.manualSeed, log_text,
+                                     out_dir + '/Iter_{:d}.tar'.format(it))
                     print('Save model to ' + out_dir + '/Iter_{:d}.tar'.format(it))
             else:
                 if it % config.save_interval == 0 and it:
-                    save_model(it, flow, 0, config.manualSeed, log_text,
-                               out_dir + '/Iter_{:d}.tar'.format(it))
+                    utils.save_model(it, flow, 0, config.manualSeed, log_text,
+                                     out_dir + '/Iter_{:d}.tar'.format(it))
                 print('Save model to ' + out_dir + '/Iter_{:d}.tar'.format(it))
 
     run.finish()

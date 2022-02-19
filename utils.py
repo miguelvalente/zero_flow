@@ -68,17 +68,10 @@ def reduce_sum_masked(x, mask, axis):
     m = x.sum(axis=axis)
     return m
 
-if __name__ == '__main__':
-    x = torch.rand((2, 10, 10))
-    mask = torch.ones(2, 10, 10)
-    reduce_sum_masked(x, mask, axis=1)
-
-
 def log_print(s, log):
     print(s)
     with open(log, 'a') as f:
         f.write(s + '\n')
-
 
 def synthesize_feature(flow, dataset, opt, sm=None):
     gen_feat = torch.FloatTensor(dataset.ntest_class * opt.number_sample, opt.X_dim)
@@ -116,7 +109,6 @@ def synthesize_feature(flow, dataset, opt, sm=None):
                 gen_label = np.hstack((gen_label, np.ones([opt.number_sample]) * i))
 
     return gen_feat, torch.from_numpy(gen_label.astype(int))
-
 
 def save_model(it, flow, gs, random_seed, log, fout):
     torch.save({

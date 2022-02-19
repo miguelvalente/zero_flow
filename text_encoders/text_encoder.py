@@ -9,7 +9,7 @@ import utils
 from text_encoders.text_encoder_utils import split_with_overlap
 from sentence_transformers import SentenceTransformer
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer, TfidfTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 import nltk
@@ -21,36 +21,11 @@ class TFIDF():
         self.config = config
         self.device = device
         self.cv = CountVectorizer()
-        # self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, ngram_range=(1, 1))
         self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=20000, ngram_range=(1, 1))
         self.lemmatizer = WordNetLemmatizer()
         self.stemmer = PorterStemmer()
         # nltk.download('punkt')
         # nltk.download('wordnet')
-        # self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, smooth_idf=True)
-
-    def test(self, articles):
-        cv = CountVectorizer()
-
-        word_count_vector = cv.fit_transform(articles)
-        tfidf_transformer = TfidfTransformer(smooth_idf=True, use_idf=True)
-        tfidf_transformer.fit(word_count_vector)
-
-        df_idf = pd.DataFrame(tfidf_transformer.idf_, index=cv.get_feature_names(), columns=["idf_weights"])
-
-        df_idf.sort_values(by=['idf_weights'])
-
-        count_vector = cv.transform(articles)
-
-        tf_idf_vector = tfidf_transformer.transform(count_vector)
-
-        feature_names = cv.get_feature_names()
-
-        for vector in tf_idf_vector:
-            df = pd.DataFrame(vector.T.todense(), index=feature_names, columns=["tfidf"])
-            print(df.sort_values(by=["tfidf"], ascending=False)[:15], '\n\n')
-
-        print()
 
     def __call__(self, articles):
         if 'stem' in self.config['text_encoder']:
@@ -72,15 +47,6 @@ class TFIDF():
                 term_value_pair.append((term, values))
 
         return np.array(vectors.todense()).astype(np.float32), term_value_pair
-
-    def _tokenize(self, articles):
-        preprocessed = []
-        preprocessed.append(' '.join([self.stemmer.stem(item) for item in filtered]))
-        tokens = nltk.word_tokenize(articles)
-        stems = []
-        for item in tokens:
-            stems.append(PorterStemmer().stem(item))
-        return stems
 
 class SentencePiece:
     def __init__(self, config, device):

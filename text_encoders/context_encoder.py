@@ -5,23 +5,12 @@ import pickle
 import string
 
 import numpy as np
-import scipy.io
 import torch
-import yaml
-from scipy.io import savemat
 from tqdm import tqdm
 
-from text_encoders.text_encoder import (AlbertEncoder, BartEncoder,
-                                        BertEncoder, BigBirdEncoder,
-                                        ProphetNet, SentencePiece,
-                                        TFIDF)
-from text_encoders.word_embeddings import WordEmbeddings
+from text_encoders import text_encoder, word_embeddings
 import nltk
 from nltk.corpus import stopwords
-# import spacy
-# import unidecode
-# from word2number import w2n
-# import contractions
 
 IDENTITY = '  Context Encoder ~| '
 
@@ -31,24 +20,24 @@ class ContextEncoder():
         self.device = device
 
         if self.config['weighted_encoding']:
-            self.tfidf = TFIDF(self.config, device=self.device)
+            self.tfidf = text_encoder.TFIDF(self.config, device=self.device)
 
         if 'tfidf' in self.config['text_encoder']:
-            self.text_encoder = TFIDF(self.config, device=self.device)
+            self.text_encoder = text_encoder.TFIDF(self.config, device=self.device)
         elif 'prophet' in self.config['text_encoder']:
-            self.text_encoder = ProphetNet(self.config, device=self.device)
+            self.text_encoder = text_encoder.ProphetNet(self.config, device=self.device)
         elif self.config['text_encoder'] == 'albert':
-            self.text_encoder = AlbertEncoder(self.config, device=self.device)
+            self.text_encoder = text_encoder.AlbertEncoder(self.config, device=self.device)
         elif self.config['text_encoder'] == 'bart':
-            self.text_encoder = BartEncoder(self.config, device=self.device)
+            self.text_encoder = text_encoder.BartEncoder(self.config, device=self.device)
         elif self.config['text_encoder'] == 'bert':
-            self.text_encoder = BertEncoder(self.config, device=self.device)
+            self.text_encoder = text_encoder.BertEncoder(self.config, device=self.device)
         elif self.config['text_encoder'] == 'bigbird':
-            self.text_encoder = BigBirdEncoder(self.config, device=self.device)
+            self.text_encoder = text_encoder.BigBirdEncoder(self.config, device=self.device)
         elif 'sentence' in self.config['text_encoder']:
-            self.text_encoder = SentencePiece(self.config, device=self.device)
+            self.text_encoder = text_encoder.SentencePiece(self.config, device=self.device)
         elif 'glove' in self.config['text_encoder']:
-            self.text_encoder = WordEmbeddings(self.config, device=self.device)
+            self.text_encoder = word_embeddings.WordEmbeddings(self.config, device=self.device)
         else:
             print(f"{IDENTITY} Encoding setting not found")
             raise Exception
