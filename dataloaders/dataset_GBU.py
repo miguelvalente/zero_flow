@@ -42,13 +42,13 @@ class DATA_LOADER(object):
         #     self.tr_cls_centroid[i] = np.mean(self.train_feature[self.train_label == i].numpy(), axis=0)
 
     def read_zsl(self, opt):
-        is_val = False
+        txt_feat_path = 'data/CUB_200_2011/cizsl/CUB_Porter_7551D_TFIDF_new.mat'
         if 'easy' in opt.split:
             train_test_split_dir = 'data/CUB_200_2011/cizsl/train_test_split_easy.mat'
             pfc_label_path_train = 'data/CUB_200_2011/cizsl/labels_train.pkl'
             pfc_label_path_test = 'data/CUB_200_2011/cizsl/labels_test.pkl'
-            # pfc_feat_path_train = 'data/CIZSL/CUB2011/pfc_feat_train.mat'  # pfc_feat (8855, 3584)
-            # pfc_feat_path_test = 'data/CIZSL/CUB2011/pfc_feat_test.mat'  # pfc_feat (2933, 3584)
+            pfc_feat_path_train = 'data/CUB_200_2011/cizsl/pfc_feat_train.mat'  # pfc_feat (8855, 3584)
+            pfc_feat_path_test = 'data/CUB_200_2011/cizsl/pfc_feat_test.mat'  # pfc_feat (2933, 3584)
 
             train_cls_num = 150
             test_cls_num = 50
@@ -57,8 +57,8 @@ class DATA_LOADER(object):
             train_test_split_dir = 'data/CUB_200_2011/cizsl/train_test_split_hard.mat'
             pfc_label_path_train = 'data/CUB_200_2011/cizsl/labels_train_hard.pkl'
             pfc_label_path_test = 'data/CUB_200_2011/cizsl/labels_test_hard.pkl'
-            # pfc_feat_path_train = 'data/CIZSL/CUB2011/pfc_feat_train_hard.mat'  # pfc_feat (9410, 3584)
-            # pfc_feat_path_test = 'data/CIZSL/CUB2011/pfc_feat_test_hard.mat'  # pfc_feat (2378, 3584)
+            pfc_feat_path_train = 'data/CUB_200_2011/cizsl/pfc_feat_train_hard.mat'  # pfc_feat (9410, 3584)
+            pfc_feat_path_test = 'data/CUB_200_2011/cizsl/pfc_feat_test_hard.mat'  # pfc_feat (2378, 3584)
 
             train_cls_num = 160
             test_cls_num = 40
@@ -70,13 +70,25 @@ class DATA_LOADER(object):
         train_fea = matcontent['train_fea']
         test_fea = matcontent['val_fea']
 
-        # Image Features Normalization
-        min_max_scaler = preprocessing.MinMaxScaler().fit(train_fea)
-        train_fea = min_max_scaler.transform(train_fea)
-        test_fea = min_max_scaler.transform(test_fea)
+        self.pfc_feat_data_test = test_fea
+        self.pfc_feat_data_train = train_fea
 
-        self.pfc_feat_data_train = train_fea.astype(np.float32)
-        self.pfc_feat_data_test = test_fea.astype(np.float32)
+        # self.pfc_feat_data_train = loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
+        # self.pfc_feat_data_test = loadmat(pfc_feat_path_test)['pfc_feat'].astype(np.float32)
+        # Image Features Normalization
+        # min_max_scaler = preprocessing.MinMaxScaler().fit(train_fea)
+        # train_fea = min_max_scaler.transform(train_fea)
+        # test_fea = min_max_scaler.transform(test_fea)
+        if 'min' in opt.split:
+            min_max_scaler = preprocessing.MinMaxScaler().fit(self.pfc_feat_data_train)
+            self.pfc_feat_data_train = min_max_scaler.transform(self.pfc_feat_data_train)
+            self.pfc_feat_data_test = min_max_scaler.transform(self.pfc_feat_data_test)
+        else:
+            mean = self.pfc_feat_data_train.mean()
+            var = self.pfc_feat_data_train.var()
+            self.pfc_feat_data_train = (self.pfc_feat_data_train - mean) / var  # X_tr
+            self.pfc_feat_data_test = (self.pfc_feat_data_test - mean) / var  # X_te
+
         # calculate the corresponding centroid.
         with open(pfc_label_path_train, 'rb') as fout1, open(pfc_label_path_test, 'rb') as fout2:
             self.labels_train = pickle.load(fout1, encoding="latin1")
@@ -86,11 +98,6 @@ class DATA_LOADER(object):
         self.test_cls_num = test_cls_num  # Y_test
         self.feature_dim = self.pfc_feat_data_train.shape[1]
 
-        # mean = self.pfc_feat_data_train.mean()
-        # var = self.pfc_feat_data_train.var()
-        # self.pfc_feat_data_train = (self.pfc_feat_data_train - mean) / var  # X_tr
-        # self.pfc_feat_data_test = (self.pfc_feat_data_test - mean) / var  # X_te
-
         self.tr_cls_centroid = np.zeros([self.train_cls_num, self.pfc_feat_data_train.shape[1]]).astype(np.float32)
         # print(self.tr_cls_centroid.shape) # e.g. (160, 3584)
 
@@ -98,10 +105,9 @@ class DATA_LOADER(object):
         for i in range(self.train_cls_num):
             self.tr_cls_centroid[i] = np.mean(self.pfc_feat_data_train[self.labels_train == i], axis=0)
 
-        if not is_val:
-            self.train_text_feature, self.test_text_feature = get_text_feature(attribute,
-                                                                               train_test_split_dir)  # Z_tr, Z_te
-            self.att_dim = self.train_text_feature.shape[1]
+        self.train_text_feature, self.test_text_feature = get_text_feature(txt_feat_path,
+                                                                           train_test_split_dir)  # Z_tr, Z_te
+        self.att_dim = self.train_text_feature.shape[1]
 
         self.ntrain_class = self.train_cls_num
         self.ntest_class = self.test_cls_num
@@ -123,61 +129,34 @@ class DATA_LOADER(object):
         self.test_unseen_feature = torch.tensor(self.pfc_feat_data_test)
 
     def read_zsl_benchmark(self, opt):
-        txt_feat_path = 'data/CIZSL/CUB2011/CUB_Porter_7551D_TFIDF_new.mat'
+        txt_feat_path = 'data/CUB_200_2011/cizsl/CUB_Porter_7551D_TFIDF_new.mat'
         # matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/data.mat")
-        is_val = False
         if 'easy' in opt.split:
-            train_test_split_dir = 'data/CIZSL/CUB2011/train_test_split_easy.mat'
-            pfc_label_path_train = 'data/CIZSL/CUB2011/labels_train.pkl'
-            pfc_label_path_test = 'data/CIZSL/CUB2011/labels_test.pkl'
-            pfc_feat_path_train = 'data/CIZSL/CUB2011/pfc_feat_train.mat'  # pfc_feat (8855, 3584)
-            pfc_feat_path_test = 'data/CIZSL/CUB2011/pfc_feat_test.mat'  # pfc_feat (2933, 3584)
+            train_test_split_dir = 'data/CUB_200_2011/cizsl/train_test_split_easy.mat'
+            pfc_label_path_train = 'data/CUB_200_2011/cizsl/labels_train.pkl'
+            pfc_label_path_test = 'data/CUB_200_2011/cizsl/labels_test.pkl'
+            pfc_feat_path_train = 'data/CUB_200_2011/cizsl/pfc_feat_train.mat'  # pfc_feat (8855, 3584)
+            pfc_feat_path_test = 'data/CUB_200_2011/cizsl/pfc_feat_test.mat'  # pfc_feat (2933, 3584)
 
-            if is_val:
-                train_cls_num = 120
-                test_cls_num = 30
-            else:
-                train_cls_num = 150
-                test_cls_num = 50
+            train_cls_num = 150
+            test_cls_num = 50
+
         elif 'hard' in opt.split:
-            train_test_split_dir = 'data/CIZSL/CUB2011/train_test_split_hard.mat'
-            pfc_label_path_train = 'data/CIZSL/CUB2011/labels_train_hard.pkl'
-            pfc_label_path_test = 'data/CIZSL/CUB2011/labels_test_hard.pkl'
-            pfc_feat_path_train = 'data/CIZSL/CUB2011/pfc_feat_train_hard.mat'  # pfc_feat (9410, 3584)
-            pfc_feat_path_test = 'data/CIZSL/CUB2011/pfc_feat_test_hard.mat'  # pfc_feat (2378, 3584)
+            train_test_split_dir = 'data/CUB_200_2011/cizsl/train_test_split_hard.mat'
+            pfc_label_path_train = 'data/CUB_200_2011/cizsl/labels_train_hard.pkl'
+            pfc_label_path_test = 'data/CUB_200_2011/cizsl/labels_test_hard.pkl'
+            pfc_feat_path_train = 'data/CUB_200_2011/cizsl/pfc_feat_train_hard.mat'  # pfc_feat (9410, 3584)
+            pfc_feat_path_test = 'data/CUB_200_2011/cizsl/pfc_feat_test_hard.mat'  # pfc_feat (2378, 3584)
 
-            if is_val:
-                train_cls_num = 130
-                test_cls_num = 30
-            else:
-                train_cls_num = 160
-                test_cls_num = 40
+            train_cls_num = 160
+            test_cls_num = 40
 
-        if is_val:
-            # load .mat as numpy by scipy.io as sio, easy (8855, 3584) e.g.
-            data_features = loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
-            # load .pkl label file
-            with open(pfc_label_path_train) as fout:
-                data_labels = pickle.load(fout, encoding="latin1")
-                # print('=============', data_labels.shape)
-            # assert 0
-
-            # why we use data_labels < train_cls_num
-            self.pfc_feat_data_train = data_features[data_labels < train_cls_num]
-            self.pfc_feat_data_test = data_features[data_labels >= train_cls_num]
-            self.labels_train = data_labels[data_labels < train_cls_num]
-            self.labels_test = data_labels[data_labels >= train_cls_num] - train_cls_num
-
-            text_features, _ = get_text_feature(txt_feat_path, train_test_split_dir)  # Z_tr, Z_te
-            self.train_text_feature, self.test_text_feature = text_features[:train_cls_num], text_features[train_cls_num:]
-            self.att_dim = self.train_text_feature.shape[1]
-        else:
-            self.pfc_feat_data_train = loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
-            self.pfc_feat_data_test = loadmat(pfc_feat_path_test)['pfc_feat'].astype(np.float32)
-            # calculate the corresponding centroid.
-            with open(pfc_label_path_train, 'rb') as fout1, open(pfc_label_path_test, 'rb') as fout2:
-                self.labels_train = pickle.load(fout1, encoding="latin1")
-                self.labels_test = pickle.load(fout2, encoding="latin1")
+        self.pfc_feat_data_train = loadmat(pfc_feat_path_train)['pfc_feat'].astype(np.float32)
+        self.pfc_feat_data_test = loadmat(pfc_feat_path_test)['pfc_feat'].astype(np.float32)
+        # calculate the corresponding centroid.
+        with open(pfc_label_path_train, 'rb') as fout1, open(pfc_label_path_test, 'rb') as fout2:
+            self.labels_train = pickle.load(fout1, encoding="latin1")
+            self.labels_test = pickle.load(fout2, encoding="latin1")
 
         self.train_cls_num = train_cls_num  # Y_train
         self.test_cls_num = test_cls_num  # Y_test
@@ -196,10 +175,9 @@ class DATA_LOADER(object):
         for i in range(self.train_cls_num):
             self.tr_cls_centroid[i] = np.mean(self.pfc_feat_data_train[self.labels_train == i], axis=0)
 
-        if not is_val:
-            self.train_text_feature, self.test_text_feature = get_text_feature(txt_feat_path,
-                                                                               train_test_split_dir)  # Z_tr, Z_te
-            self.att_dim = self.train_text_feature.shape[1]
+        self.train_text_feature, self.test_text_feature = get_text_feature(txt_feat_path,
+                                                                           train_test_split_dir)  # Z_tr, Z_te
+        self.att_dim = self.train_text_feature.shape[1]
 
         self.ntrain_class = self.train_cls_num
         self.ntest_class = self.test_cls_num
@@ -243,6 +221,12 @@ class DATA_LOADER(object):
         train_fea = min_max_scaler.transform(train_fea)
         test_seen_feature = min_max_scaler.transform(test_seen_fea)
         test_unseen_feature = min_max_scaler.transform(test_unseen_fea)
+        # mean = train_fea.mean(axis=0)
+        # train_fea -= mean
+        # var = train_fea.var(axis=0)
+        # train_fea /= var
+        # test_seen_fea = (test_seen_fea - mean) / var
+        # test_unseen_fea = (test_unseen_fea - mean) / var
 
         if opt.normalize_semantics:
             # Semantic Features Normalization
@@ -250,15 +234,6 @@ class DATA_LOADER(object):
             # std_scaler = preprocessing.StandardScaler().fit(self.train_att)
             self.train_att = min_max_scaler .transform(self.train_att)
             self.test_att = min_max_scaler.transform(self.test_att)
-
-        # scaler = preprocessing.MinMaxScaler()
-        # _train_feature = scaler.fit_transform(train_fea)
-        # _test_seen_feature = scaler.transform(test_seen_fea)
-        # _test_unseen_feature = scaler.transform(test_unseen_fea)
-        # mx = _train_feature.max()
-        # train_fea = train_fea * (1 / mx)
-        # test_seen_fea = test_seen_fea * (1 / mx)
-        # test_unseen_fea = test_unseen_fea * (1 / mx)
 
         self.train_feature = torch.from_numpy(train_fea).float()
         self.test_seen_feature = torch.from_numpy(test_seen_fea).float()

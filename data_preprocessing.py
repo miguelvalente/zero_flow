@@ -13,36 +13,60 @@ from distributions import SemanticDistribution
 from image_encoder.image_encoder import ImageEncoder
 from text_encoders.context_encoder import ContextEncoder
 import pandas as pd
+import csv
 
 IDENTITY = '  Data Preprocess ~| '
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+def article_correspondences(class_article_correspondences_path, class_article_text_descriptions_path):
+    articles = pickle.load(
+        open(class_article_text_descriptions_path, 'rb')
+    )
+
+    temp = [articles[art] for art in articles]
+    articles = {t['wnid']: t['articles'] for t in temp}
+
+    with open(class_article_correspondences_path, 'r') as file:
+        reader = csv.reader(file)
+        article_correspondences = {item[0]: idx for idx, item in enumerate(reader)}  # Make a dictionary out of the csv {wnid: classes}
+
+    return article_correspondences, articles
+
 def pickle_to_mat(path, config):
     dir_data = 'image_net'
-
-    path = 'data/image_net/mat/text/ALBERT_ImageNet_trainval_classes_classes.pkl'
+    path = 'data/image_net/mat/text/ALBERT_ImageNet_trainval_classes_classes_base.pkl'
+    with open(path, 'rb') as f:
+        data = pickle.load(f)
     splits = loadmat('data/image_net/ImageNet_splits.mat')
 
     seen = np.sort(splits['train_classes'].squeeze())
     unseen = np.sort(splits['val_classes'].squeeze())
-    with open(path, 'rb') as f:
-        data = pickle.load(f)
-    corre = pd.read_csv('data/image_net/wnid_correspondance.csv', sep=' ', names=['id', 'wnid'])
 
+    class_ids_dir = "data/image_net/ImageNet-Wiki_dataset/class_article_correspondences/class_article_correspondences_trainval.csv"
+    articles_dir = "data/image_net/ImageNet-Wiki_dataset/class_article_text_descriptions/class_article_text_descriptions_trainval.pkl"
+
+    corre, articles = article_correspondences(class_ids_dir, articles_dir)
+    corre = corre.items()
+    data_list = list(corre)
+
+    corre = pd.DataFrame(data_list)
+    corre = corre.rename({0: 'wnid', 1: 'id'}, axis='columns')
+
+    att = []
     train_att = []
     val_att = []
-    att = []
     wnid_att_train = []
     wnid_att_test = []
-    for k, v in data.items():
-        att.append(v['feats'])
+
+    for idx, (k, v) in enumerate(data.items()):
         img_id = corre[corre["wnid"] == v['wnid']].id.values[0]
         train_att.append(v['feats']) if img_id in seen else val_att.append(v['feats'])
+        att.append(v['feats'])
         wnid_att_train.append(v['wnid']) if img_id in seen else wnid_att_test.append(v['wnid'])
 
+    att = np.stack(att)
     train_att = np.stack(train_att)
     val_att = np.stack(val_att)
-    att = np.stack(att)
     wnid_att_train = np.stack(wnid_att_train)
     wnid_att_test = np.stack(wnid_att_test)
 
@@ -50,9 +74,13 @@ def pickle_to_mat(path, config):
                     'train_att': train_att,
                     'val_att': val_att,
                     'wnid_train': wnid_att_train,
-                    'wnid_test': wnid_att_test}
+                    'wnid_test': wnid_att_test,
+                    'text_config': text_config}
 
-    text_mat_path = f"data/{dir_data}/mat/text/{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
+    # text_mat_path = f"data/{dir_data}/mat/text/{config['text_encoder']}_{str(config['preprocess_text'])}.mat"
+    text_mat_path = f"data/{dir_data}/mat/text/ALBERT_ImageNet_trainval_classes_classes_base.mat"
+    with open(f"{text_mat_path[:-3]}yaml", "w") as f:
+        yaml.dump(config, f)
 
     savemat(text_mat_path, semantic_dic)
     sys.exit()
@@ -71,13 +99,13 @@ else:
 
 image_mat_path = f"data/{dir_data}/mat/visual/{config['image_encoder']}_{config['split'][:-4]}.mat"
 text_mat_path = f"data/{dir_data}/mat/text/{config['text_encoder']}_{str(config['preprocess_text'])}.mat"
-data_dic_path = f"data/{dir_data}/mat/{config['image_encoder']}_{config['split'][:-4]}_{config['text_encoder']}_{str(config['semantic_sampling'])}.mat"
+data_dic_path = f"data/{dir_data}/mat/{config['image_encoder']}_{config['split'][:-4]}_{config['text_encoder']}_{str(config['preprocess_text'])}.mat"
 print(f"{data_dic_path}")
 
 # easy_split_train = loadmat("data/CUB_200_2011/cizsl/CUB2011/pfc_feat_train.mat")
 # easy_split_test = loadmat("data/CUB_200_2011/cizsl/CUB2011/pfc_feat_test.mat")
 # train_test_split_dir = loadmat('data/CUB_200_2011/cizsl/CUB2011/train_test_split_hard.mat')
-# # pickle_to_mat('asd', config)
+# pickle_to_mat('asd', config)
 
 if os.path.exists(data_dic_path):
     print(f'\n{IDENTITY} {data_dic_path} already exists.')
@@ -165,9 +193,9 @@ else:
                         'wnid_test': wnid_att_test,
                         'text_config': text_config}
     path = 'data/image_net/mat/text/ALBERT_ImageNet_trainval_classes_classes.pkl'
-    savemat(text_mat_path, semantic_dic)
-    with open(f"{text_mat_path[:-3]}yaml", "w") as f:
-        yaml.dump(config, f)
+    # savemat(text_mat_path, semantic_dic)
+    # with open(f"{text_mat_path[:-3]}yaml", "w") as f:
+        # yaml.dump(config, f)
 
 if config['dataset'] == "cub2011":
     # data = loadmat("data/data/CUB/data.mat")

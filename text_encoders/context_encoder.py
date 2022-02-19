@@ -87,18 +87,28 @@ class ContextEncoder():
 
         if weighted_encoding:
             _, term_value = self.tfidf(articles)
-            self.attributes = np.stack([(self.text_encoder(terms)).mean(axis=0)
-                                       for terms, values in term_value]).astype(np.float32)
+            self.attributes = []
+            mean = True
+            summi = False
+            top_term = 1024
+            for terms, values in tqdm(term_value, desc='encoding with tfidf weights'):
+                if mean:
+                    self.attributes.append(self.text_encoder(terms[:top_term], reduce=True))
+                elif summi:
+                    self.attributes.append(np.stack(self.text_encoder(terms[:top_term])).sum(axis=0))
+                else:
+                    self.attributes.append((self.text_encoder(terms[:top_term]) * np.stack(values)[:top_term]).mean(axis=0))
                 # 2 options:
                 # - encode all as one
-                # - encode each word separatly and weigth it
+                # - encode (each word separatly and weigth it
+            self.attributes = np.stack(self.attributes)
         else:
             if 'tfidf' in self.config['text_encoder']:
                 self.attributes, _ = self.text_encoder(articles)
             else:
                 semantic = tqdm(articles, desc=f'{IDENTITY} Encoding All Semantic Descriptions CUB2011')
                 with torch.no_grad():
-                    contexts = [(self.text_encoder(article)).type(torch.float32) for article in semantic]
+                    contexts = [torch.tensor((self.text_encoder(article))).type(torch.float32) for article in semantic]
                 self.attributes = np.stack([feature.cpu().numpy() for feature in contexts])
 
     def _encode_contexts_imagenet(self, weighted_encoding=False):
@@ -127,12 +137,13 @@ class ContextEncoder():
 
         if weighted_encoding:
             _, term_value = self.tfidf(articles)
-            term_value_bar = tqdm(articles, desc=f'{IDENTITY} Encoding All Semantic Descriptions ImageNet')
-            self.attributes = np.stack([(self.text_encoder(terms)).mean(axis=0)
-                                       for terms, values in term_value_bar]).astype(np.float32)
+            self.attributes = []
+            for terms, values in tqdm(term_value, desc='encoding with tfidf weights'):
+                self.attributes.append(np.stack((self.text_encoder(terms)).mean(axis=0)))
                 # 2 options:
                 # - encode all as one
                 # - encode each word separatly and weigth it
+            self.attributes = np.stack(self.attributes)
         else:
             if 'tfidf' in self.config['text_encoder']:
                 self.attributes, self.term_value_pair = self.text_encoder(articles)

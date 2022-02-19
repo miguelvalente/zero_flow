@@ -1,6 +1,6 @@
 epochs:
   desc: Number of epochs to train over
-  value: 100
+  value: 60
 batchsize:
   desc: Size of each batch
   value: 256
@@ -45,25 +45,25 @@ lr:
   value: 0.0003
 weight_decay:
   desc:
-  value: 1e-5
+  value: 1e-2
 classifier_lr:
   desc: learning rate to train softmax classifier'
   value: 0.005
 number_sample:
   desc: number features to generate per class
-  value: 2000
+  value: 300
 disp_interval:
   desc: interval
-  value: 100
+  value: 27
 save_interval:
   desc: save inetrvak of checkpoint
   value: 10000
 evl_interval:
   desc: eval interval
-  value: 250
+  value: 27
 semantic_vector_dim:
   desc: Dimension of semantic vectors
-  value: 1024
+  value: 768
 pi:
   desc: degree of the perturbation
   value: 0
@@ -72,7 +72,7 @@ dropout:
   value: 0.0
 gzsl:
   desc: The paradigm of zero-shot learning
-  value: False
+  value: True
 clusters:
   desc:
   value: 3
@@ -93,20 +93,4 @@ normalize_semantics:
   value: False
 data_dir:
   desc: data directory
-  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_tf_idf_mean_False.mat
-  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_weigthed_False.mat
-  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_full_stop_bigram_7000_False.mat
-  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_full_stop_bigram_False.mat
-  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_5000_False.mat
-  value: data/CUB_200_2011/mat/resnet50d_easy_split_tfidf_False.mat # data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_7000_False.mat
-  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_unfiltered_False.mat
-  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_cleanedup_False.mat
-  # value: data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_porter755_False.mat
-  # 'data/CUB_200_2011/mat/resnet50d_proposed_split.txt_sentence_clean_whole.mat'
-  # value: 'data/CUB_200_2011/mat/resnet50d_proposed_split_sentence_cleaner_whole_True.mat'
-  # '
-  # data/CUB_200_2011/mat/resnet50d_proposed_split.txt_sentence_len_clean.mat'
-  # 'data/CUB_200_2011/mat/resnet50d_hard_split.txt_sentence_len.mat' #'data/CUB_200_2011/hard_split.txt'
-  # value: 'data/CUB_200_2011/mat/resnet50d_albert.mat'
-  # value: 'data/CUB_200_2011/mat/resnet50d_sentence_len_50.mat' # 'data/CUB_200_2011/mat/resnet50d_sentence_len.mat' # "  #/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 
-  # value: 'data/CUB_200_2011/mat/resnet50d_sentence_len.mat' # "  #/project/data/CUB_200_2011/mat/resnet50d_glove840B.mat" 
+  value: data/CUB_200_2011/mat/efficientnet_b3a_proposed_split_tfidf_5000_False.mat # data/CUB_200_2011/mat/resnet50d_proposed_split_tfidf_5000_False.mat

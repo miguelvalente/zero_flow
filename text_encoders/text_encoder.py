@@ -21,8 +21,8 @@ class TFIDF():
         self.config = config
         self.device = device
         self.cv = CountVectorizer()
-        self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, ngram_range=(1, 1))
-        # self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=20000, ngram_range=(1, 1))
+        # self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, ngram_range=(1, 1))
+        self.tfidf_vectorizer = TfidfVectorizer(use_idf=True, max_features=20000, ngram_range=(1, 1))
         self.lemmatizer = WordNetLemmatizer()
         self.stemmer = PorterStemmer()
         # nltk.download('punkt')
@@ -266,7 +266,7 @@ class AlbertEncoder(BaseEncoder):
         split_text = split_with_overlap(long_text,
                                         max_length=256,
                                         overlap_window_length=50,
-                                        tokenize_func=self.tokenizer.tokenize)  # NOTE: This is not fully correct. Has issues with sub-words (results do not differ much, however).
+                                        tokenize_func=self.tokenizer.tokenize)  
 
         encoded_splits = None
         _from = 0

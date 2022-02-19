@@ -17,6 +17,7 @@ import tqdm
 import yaml
 from scipy.io import loadmat, savemat
 from sklearn.metrics.pairwise import cosine_similarity
+from nets import LinearModule, GSModule
 
 import classifier
 import wandb
@@ -28,46 +29,40 @@ from permuters import LinearLU, Permuter, Reverse
 from transform import Flow
 from utils import Result, log_print, save_model, synthesize_feature
 
-#CUDA_LAUNCH_BLOCKING = 1
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-os.environ['WANDB_MODE'] = 'dryrun'
-run = wandb.init(project='zero_flow_CUB', entity='mvalente',
-                 config=r'config/flow_cub.yaml')
+def train():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    os.environ['WANDB_MODE'] = 'online'
+    run = wandb.init(project='zero_flow_CUB', entity='mvalente',
+                     config=r'config/flow_cub.yaml',
+                     reinit=True)
 
-config = wandb.config
-with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
-    temp = yaml.safe_load(y)
+    config = wandb.config
+    with open(f"{config.data_dir[:-3]}yaml", 'r') as y:
+        temp = yaml.safe_load(y)
+        wandb.config['image_encoder'] = temp['image_encoder']
+        wandb.config['text_encoder'] = temp['text_encoder']
+        wandb.config['split'] = f"min_max_{temp['split']}"
+        wandb.config['dataset'] = temp['dataset']
+        del temp
+
     # wandb.config['image_encoder'] = 'cizsl'
     # wandb.config['text_encoder'] = 'cizsl'
-    # wandb.config['split'] = 'hard'
-    wandb.config['image_encoder'] = temp['image_encoder']
-    wandb.config['text_encoder'] = temp['text_encoder']
-    wandb.config['split'] = temp['split']
-    wandb.config['dataset'] = temp['dataset']
-    del temp
+    # wandb.config['split'] = 'easy_benchmark_2'
+    # wandb.config['dataset'] = 'cub2011'
 
-# config = wandb.config
-# with open(config.imagenet_text_encode, 'r') as f:
-#     temp = yaml.safe_load(f)
-#     wandb.config['image_encoder'] = 'resnet101'
-#     wandb.config['dataset'] = 'image_net'
-#     wandb.config['text_encoder'] = temp['text_encoder']
+    wandb.define_metric('Harmonic Mean', summary='max')
+    wandb.define_metric('Accuracy Unseen', summary='max')
+    wandb.define_metric('Accuracy Seen', summary='max')
 
-# wandb.define_metric('Harmonic Mean', summary='max')
-wandb.define_metric('Accuracy Unseen', summary='max')
-# wandb.define_metric('Accuracy Seen', summary='max')
+    #  os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    wandb.config.manualSeed = random.randint(1, 10000)
+    print("Random Seed: ", config.manualSeed)
+    np.random.seed(config.manualSeed)
+    random.seed(config.manualSeed)
+    torch.manual_seed(config.manualSeed)
+    torch.cuda.manual_seed_all(config.manualSeed)
+    cudnn.benchmark = True
 
-#  os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-wandb.config.manualSeed = random.randint(1, 10000)
-print("Random Seed: ", config.manualSeed)
-np.random.seed(config.manualSeed)
-random.seed(config.manualSeed)
-torch.manual_seed(config.manualSeed)
-torch.cuda.manual_seed_all(config.manualSeed)
-cudnn.benchmark = True
-
-
-def train():
     dataset = DATA_LOADER(config)
     config.C_dim = dataset.att_dim
     config.X_dim = dataset.feature_dim
@@ -87,6 +82,7 @@ def train():
     dataset.feature_dim = dataset.train_feature.shape[1]
     data_layer = FeatDataLayer(dataset.train_label.numpy(), dataset.train_feature.cpu().numpy(), config)
     config.niter = int((dataset.ntrain / config.batchsize) * config.epochs)
+    print(f'Each epoch has {int(dataset.ntrain / config.batchsize)} iterations')
 
     result = Result()
     sim = cosine_similarity(dataset.train_att, dataset.train_att)
@@ -228,7 +224,7 @@ def train():
             log_text = f'Iter-[{it}/{config.niter}]; loss: {loss.item():.3f}'
             log_print(log_text, log_dir)
 
-        if it % config.evl_interval == 0 and it >= 500:
+        if it % config.evl_interval == 0 and it >= 20:
             flow.eval()
             if config.relative_positioning:
                 sm.eval()
@@ -288,32 +284,6 @@ def train():
                                out_dir + '/Iter_{:d}.tar'.format(it))
                 print('Save model to ' + out_dir + '/Iter_{:d}.tar'.format(it))
 
-class LinearModule(nn.Module):
-    def __init__(self, vertice, out_dim):
-        super(LinearModule, self).__init__()
-        self.register_buffer('vertice', vertice.clone())
-        self.fc = nn.Linear(vertice.numel(), out_dim)
-
-    def forward(self, semantic_vec):
-        input_offsets = semantic_vec - self.vertice
-        response = F.relu(self.fc(input_offsets))
-        return response
-
-class GSModule(nn.Module):
-    def __init__(self, vertices, out_dim):
-        super(GSModule, self).__init__()
-        self.individuals = nn.ModuleList()
-        assert vertices.dim() == 2, 'invalid shape : {:}'.format(vertices.shape)
-        self.out_dim = out_dim
-        self.require_adj = False
-        for i in range(vertices.shape[0]):
-            layer = LinearModule(vertices[i], out_dim)
-            self.individuals.append(layer)
-
-    def forward(self, semantic_vec):
-        responses = [indiv(semantic_vec) for indiv in self.individuals]
-        global_semantic = sum(responses)
-        return global_semantic
-
+    run.finish()
 if __name__ == "__main__":
     train()

@@ -72,6 +72,8 @@ class WordEmbeddings:
                 yield token.text
 
     def encode_long_text(self, text):
+        if isinstance(text, list):
+            pass
         if True:  # text to lower case
             text = text.lower()
 

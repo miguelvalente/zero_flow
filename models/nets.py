@@ -39,7 +39,6 @@ class Classifier(nn.Module):
         output = self.logic(self.fc(x))
         return output
 
-
 class GSModule(nn.Module):
     def __init__(self, vertices, out_dim):
         super(GSModule, self).__init__()
@@ -64,5 +63,5 @@ class LinearModule(nn.Module):
 
     def forward(self, semantic_vec):
         input_offsets = semantic_vec - self.vertice
-        response = F.relu(self.fc(input_offsets))
+        response = F.relu(self.fc(input_offsets.float()))
         return response
