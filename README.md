@@ -5,7 +5,7 @@
 </h2>
 
 
-Zero Flow tackles Zero-Shot Learning by simulating or generating missing data with Generative Neural Networks made of Normalizing Flows. For that, I tried to establish a connection between semantics extracted from text, using several text encoding methods and visual features obtained from convolutional neural networks and by making use of Gaussian Distributions. In the end, the approach proved to be possible in the limited domain of the CUB2011 and ImageNet achieving state-of-the-art results.
+Zero Flow tackles Zero-Shot Learning by simulating or generating missing data with Normalizing Flows,a type of Generative Neural Networks. A connection was established between text and visual  encodings.
 
 <h3 align="center">
     <a href="https://www.miguelvalente.xyz/files/msc_thesis_miguelvalente.pdf">Read The Work</a>
